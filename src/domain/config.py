@@ -1,4 +1,4 @@
-#Aquest document serveix per importarnt les variables del doc .env i convertirles envariables d'entorn.
+#Aquest document serveix per important les variables del doc .env i convertir-les en variables d'entorn.
 import os 
 from dotenv import load_dotenv
 
