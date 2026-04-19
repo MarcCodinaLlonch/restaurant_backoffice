@@ -109,5 +109,3 @@ class Sale(Base):
 
     menu: Mapped["Menu"] = relationship(back_populates="sales")
     employee: Mapped["Employee"] = relationship(back_populates="sales")
-
-Base.metadata.create_all(engine)
