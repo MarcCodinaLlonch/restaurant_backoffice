@@ -11,3 +11,7 @@ from .models import (
     dish_allergen,
     menu_dish
 )
+from .repositories import (
+    CategoryRepository,
+    EmployeeRepository
+)

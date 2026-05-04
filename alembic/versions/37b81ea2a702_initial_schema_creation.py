@@ -1,4 +1,4 @@
-"""InitialCreation
+"""Initial schema creation
 
 Revision ID: 37b81ea2a702
 Revises: 
