@@ -1,12 +1,9 @@
-"""
-Aquest fitxer defineix la capa de persistència de dades (Repòsitoris).
-L'objectiu és crear una capa intermèdia entre la base de dades i la lògica del programa.
-D'aquesta manera, el programa no parla directament amb la base de dades, sinó que
-fa servir aquests repositoris per guardar (save) o recuperar (get) objectes.
-"""
+# repositories.py defineix capa de persistència de dades mitjançant el patró Repositori.
+# Crea capa intermèdia entre la bd's i la lògica del programa.
+# El programa no parla directament amb la bd's, fa servir repositoris per guardar (add) o recuperar (get) objectes.
 
 from sqlalchemy.orm import Session
-from collections.abc import Iterable # Què fa?
+from collections.abc import Iterable
 from .models import (
     Employee,
     Category,
@@ -15,109 +12,220 @@ from .models import (
     Sale,
     Allergen
 )
-from typing import Generic, TypeVar, Type
+from typing import Generic, TypeVar
 from sqlalchemy import select, or_
 
+# TypeVar permet definir tipus genèrics.
+K = TypeVar("K") # K: Tipus de la clau primària (normalment int, però tuple per a Sale)
+V = TypeVar("V") # V: Tipus del model (Category, Employee, Dish...)
 
-# Definim una variable de tipus genèrica 'T'.
-# Això permet que la classe Repository serveixi per a qualsevol model (Category, Employee, etc.)
-K = TypeVar("K")
-V = TypeVar("V")
-
-# El Repositori Genèric és un "motlle" o classe pare.
-# Serveix per no haver de repetir el mateix codi per a cada taula de la base de dades.
+# Repositori Genèric: classe pare que conté operacions CRUD bàsiques.
+# Amb Generic[K, V], aquesta classe funciona per qualsevol model sense repetir el mateix codi a cada fill.
 class Repository(Generic[K, V]):
-    # El constructor rep la 'session' (la connexió activa a la DB).
-    # Passem la sessió per paràmetre per poder fer tests més fàcilment (injecció de dependències).
+
+    # El constructor rep sessió activa i classe del model que gestionarà.
     def __init__(self, session: Session, model_class):
         self.session = session
         self.model_class = model_class
 
-    # Mètode genèric per afegir un objecte a la sessió de la base de dades.
-    def add(self, v: V): #Passem objecte("Taula") com a paràmetre
+    # Indica objecte a inserit a la bd's. Executa INSERT quan es fa commit (a Unit of Work).
+    def add(self, v: V):
         self.session.add(v)
 
+    # Busca l'objecte per ID, l'eliminació no s'executa fins que es fa commit.
     def delete(self, k: K):
         v = self.get(k)
         self.session.delete(v)
 
+    # Sincronitza objecte modificat amb bd's.
     def update(self, v: V):
-        self.session.merge(v)
+        self.session.merge(v) # merge() és útil quan l'objecte pot estar "desconnectat" de la sessió actual.
 
-    # Mètode genèric per buscar un element pel seu ID (clau primària).
+    # Busca objecte per clau primària. Retorna l'objecte si existeix, o None si no es troba.
     def get(self, id: K):
-        # .get() és un mètode propi de SQLAlchemy que busca per ID.
         return self.session.get(self.model_class, id)
 
+    # Retorna tots els registres de la taula associada al model.
     def get_all(self) -> Iterable[V]:
         stmt = select(self.model_class)
-        return self.session.scalars(stmt).all()
+        return self.session.scalars(stmt).all() # scalars() desempaqueta les tuples que retorna la BD i .all() les guarda en una llista.
 
-# Repositori per a Empleats.
-# Nota per a l'alumne: Utilitza la mateixa estructura que CategoryRepository per gestionar dades d'Employee.
-class EmployeeRepository(Repository[int, Employee]):
+class CategoryRepository(Repository[int, Category]):
     def __init__(self, session: Session):
-        super().__init__(session, Employee) #Lliguem repositori a model Employee
+        super().__init__(session, Category)
 
-    def get_by_name(self, name_surname: str) -> Employee:
-        return self.session.scalars( #scalars desempaqueta tupla retornada  per la base de dades.
-            select(Employee).where(
-                or_(
-                    Employee.name.ilike(f"%{name_surname}%"),
-                    Employee.surname.ilike(f"%{name_surname}%")
-                )
-            )
-        ).all() #.all() guarda tots els resulstats en una llista de python.
+    def add(self, category: Category):
+        # Validació: no permetem categories amb el mateix nom. Comprovem abans d'inserir per evitar errors de la bd's.
+        if self.get_by_name(category.category_name):
+            raise ValueError(f"Category '{category.category_name}' already exists.")
+        super().add(category)
 
-    def get_by_rol(self, rol: str) -> list[Employee]:
+    def update(self, category: Category):
+        # Validació: comprovem que el nou nom no existeixi en altra categoria.
+        existing = self.get_by_name(category.category_name)
+        # existing.id != category.id assegura que no comparem la categoria amb si mateixa.
+        if existing and existing.id != category.id:
+            raise ValueError(f"Category name '{category.category_name}' is already taken.")
+        super().update(category)
+
+    # Busca nom exacte, insensible a majúscules gràcies a ilike().
+    def get_by_name(self, name: str) -> Category | None:
         return self.session.scalars(
-            select(Employee).where(Employee.role == rol)
-        ).all()
+            select(Category).where(Category.category_name.ilike(name))
+        ).first() # first() retorna el primer resultat o None si no hi ha cap.
 
-    def national_id_exist(self, national_id: str) -> bool:
-        result = self.session.scalars(
-            select(Employee).where(Employee.national_id == national_id)
-        ).first()
-        return result is not None
-
-
-class MenuRepository(Repository[int, Menu]):
-    def __init__(self, session: Session):
-        super().__init__(session, Menu)
-        
-    def add_dish_to_menu(self, menu_id: int, dish: Dish):
-        # Operació de domini concreta: afegir un plat a un menú existent
-        menu = self.get(menu_id)
-        if menu:
-            menu.dishes.append(dish)
-
-class SaleRepository(Repository[tuple, Sale]):
-    def __init__(self, session: Session):
-        super().__init__(session, Sale)
-        
-    def get_paginated(self, page: int, page_size: int) -> list[Sale]:
-        # Paginació per a l'entitat que probablement tindrà més dades (Sales)
-        stmt = select(Sale).offset((page - 1) * page_size).limit(page_size)
-        return self.session.scalars(stmt).all()
-
-    def get_sales_by_date(self, target_date) -> list[Sale]:
-        return self.session.scalars(
-            select(Sale).where(Sale.sale_date == target_date)
-        ).all()
-
-class DishRepository(Repository[int, Dish]):
-    def __init__(self, session: Session):
-        super().__init__(session, Dish)
-        
-    def get_active_dishes(self) -> list[Dish]:
-        return self.session.scalars(
-            select(Dish).where(Dish.is_active == True)
-        ).all()
 
 class AllergenRepository(Repository[int, Allergen]):
     def __init__(self, session: Session):
         super().__init__(session, Allergen)
 
-class CategoryRepository(Repository[int, Category]):
+    # Cerca per nom exacte.
+    def get_by_name(self, name: str) -> Allergen | None:
+        return self.session.scalars(
+            select(Allergen).where(Allergen.allergen_name.ilike(name))
+        ).first()
+
+
+class DishRepository(Repository[int, Dish]):
     def __init__(self, session: Session):
-        super().__init__(session, Category)
+        super().__init__(session, Dish)
+
+    # Retorna només els plats que estan marcats com a actius (is_active = True).
+    def get_active_dishes(self) -> list[Dish]:
+        return self.session.scalars(
+            select(Dish).where(Dish.is_active == True)
+        ).all() # all() retorna una llista amb tots els plats actius. Si no hi ha cap, retorna una llista buida.
+
+    # Filtra els plats per la seva categoria.
+    def get_by_category(self, category_id: int) -> list[Dish]:
+        return self.session.scalars(
+            select(Dish).where(Dish.id_category == category_id)
+        ).all()
+
+    # Cerca parcial de nom: '%'' permeten trobar text en qualsevol posició del nom.
+    def get_by_name(self, name: str) -> list[Dish]:
+        return self.session.scalars(
+            select(Dish).where(Dish.dish_name.ilike(f"%{name}%"))
+        ).all()
+
+    # Afegeix un al·lèrgen a un plat sense actualitzar tot l'objecte.
+    def add_allergen_to_dish(self, dish_id: int, allergen: Allergen) -> bool:
+        dish = self.get(dish_id)
+        #Retorna False si el plat no existeix o si l'al·lèrgen ja hi era.
+        if dish is None or allergen in dish.allergens:
+            return False
+        dish.allergens.append(allergen) # SQLAlchemy insereix fila a taula intermèdia dish_allergen.
+        return True
+
+
+class EmployeeRepository(Repository[int, Employee]):
+    def __init__(self, session: Session):
+        super().__init__(session, Employee)
+
+    def add(self, employee: Employee):
+        # Validació: DNI és únic, no podem tenir dos empleats amb el mateix.
+        if self.national_id_exists(employee.national_id):
+            raise ValueError(f"Employee with national ID '{employee.national_id}' already exists.")
+        super().add(employee)
+
+    # Cerca per nom o cognom amb cerca parcial insensible a majúscules.
+    def get_by_name(self, name: str, surname: str) -> list[Employee]:
+        return self.session.scalars(
+            select(Employee).where(
+                or_(
+                    Employee.name.ilike(f"%{name}%"),
+                    Employee.surname.ilike(f"%{surname}%")
+                )
+            )
+        ).all()
+
+    # Filtra els empleats per rol ()"Cambrer", "Cuiner", "Encarregat"...).
+    def get_by_role(self, role: str) -> list[Employee]:
+        return self.session.scalars(
+            select(Employee).where(Employee.role == role)
+        ).all()
+
+    # Comprova si ja existeix un empleat amb aquest DNI.
+    def national_id_exists(self, national_id: str) -> bool:
+        result = self.session.scalars(
+            select(Employee).where(Employee.national_id == national_id)
+        ).first()
+        return result is not None # Retorna True si existeix, False si no. Valida abans d'inserir
+
+    # Paginació: retorna només una "pàgina" d'empleats.
+    def get_paginated(self, page: int, page_size: int) -> list[Employee]:
+        # offset() salta registres de pàgines anteriors. limit() limita el nombre de resultats.
+        stmt = select(Employee).offset((page - 1) * page_size).limit(page_size)
+        return self.session.scalars(stmt).all() # all() retorna llista amb empleats de la pàgina. Si no hi ha, retornallista buida.
+
+class MenuRepository(Repository[int, Menu]):
+    def __init__(self, session: Session):
+        super().__init__(session, Menu)
+
+    # Cerca parcial per nom de menú, insensible a majúscules.
+    def get_by_name(self, name: str) -> list[Menu]:
+        return self.session.scalars(
+            select(Menu).where(Menu.menu_name.ilike(f"%{name}%"))
+        ).all()
+
+    # Filtra menús per rang de preus.
+    def get_by_price_range(self, min_price: float, max_price: float) -> list[Menu]:
+        return self.session.scalars(
+            select(Menu).where(
+                Menu.price >= min_price,
+                Menu.price <= max_price
+            )
+        ).all()
+
+    # Afegeix plat a un menú sense actualitzar tot l'objecte.
+    def add_dish_to_menu(self, menu_id: int, dish: Dish):
+        menu = self.get(menu_id)
+        # Comprova que el plat no hi sigui per evitar duplicats a la taula menu_dish.
+        if menu and dish not in menu.dishes:
+            menu.dishes.append(dish)
+
+    # Elimina un plat de menú.
+    def remove_dish_from_menu(self, menu_id: int, dish: Dish) -> bool:
+        menu = self.get(menu_id)
+        if menu is None or dish not in menu.dishes:
+            return False # Retorna False si el menú no existeix o si el plat no hi és.
+        menu.dishes.remove(dish)
+        return True 
+
+# SaleRepository hereta de Repository[tuple, Sale] perquè PK de Sale és composta (id_menu, id_employee, sale_date)
+# Per fer un get() cal passar tupla: uow.sales.get((id_menu, id_employee, date)).
+class SaleRepository(Repository[tuple, Sale]):
+    def __init__(self, session: Session):
+        super().__init__(session, Sale)
+
+    # Paginació per vendes
+    def get_paginated(self, page: int, page_size: int) -> list[Sale]:
+        stmt = select(Sale).offset((page - 1) * page_size).limit(page_size)
+        return self.session.scalars(stmt).all()
+
+    # Retorna totes les vendes d'un dia concret.
+    def get_sales_by_date(self, target_date) -> list[Sale]:
+        return self.session.scalars(
+            select(Sale).where(Sale.sale_date == target_date)
+        ).all()
+
+    # Retorna totes les vendes fetes per un empleat concret.
+    def get_sales_by_employee(self, employee_id: int) -> list[Sale]:
+        return self.session.scalars(
+            select(Sale).where(Sale.id_employee == employee_id)
+        ).all()
+
+    # Retorna totes les vendes d'un menú concret.
+    def get_sales_by_menu(self, menu_id: int) -> list[Sale]:
+        return self.session.scalars(
+            select(Sale).where(Sale.id_menu == menu_id)
+        ).all()
+
+    # Retorna les vendes dins de rang de dates.
+    def get_sales_by_date_range(self, date_from, date_to) -> list[Sale]:
+        return self.session.scalars(
+            select(Sale).where(
+                Sale.sale_date >= date_from,
+                Sale.sale_date <= date_to
+            )
+        ).all()

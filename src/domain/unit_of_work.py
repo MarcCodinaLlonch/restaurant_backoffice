@@ -1,3 +1,7 @@
+# unit_of_work.py: Implementa patró Unit of Work (UoW).
+# Assegura que totes les operacions d'una mateixa acció es guarden juntes a la bd's o no es guarda res.
+# Si hi ha un error a mig camí, tot es desfà automàticament (rollback).
+
 from abc import ABC, abstractmethod
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
@@ -6,75 +10,87 @@ from .repositories import (
     SaleRepository, CategoryRepository, AllergenRepository
 )
 
-# Aquesta és la "Interfície" o Contracte.
-# Diu que qualsevol Unit of Work ha de saber fer commit i rollback.
+# Classe abstracta que defineix que ha de complir qualsevol Unit of Work.
+# ABC (Abstract Base Class) impedeix instanciar aquesta classe directament:
+# obliga a crear una classe filla que implementi commit() i rollback().
 class AbstractUnitOfWork(ABC):
-    def __enter__(self):
-        return self
 
+    # __enter__ s'executa en entrar al bloc "with".
+    def __enter__(self):
+        return self # Retorna self per poder accedir als repositoris dins del bloc.
+
+    # __exit__ s'executa en sortir del bloc "with", tant si hi ha error com si no.
     def __exit__(self, exc_type, exc_value, traceback):
-        # Si hi ha un error (exc_type no és None), fem rollback
-        if exc_type:
+        # Si hi ha hagut un error, desfem tots els canvis de la sessió
+        if exc_type: # exc_type conté el tipus d'excepció si n'hi ha hagut, o None si tot ha anat bé.
             self.rollback()
         else:
-            # Si tot ha anat bé, el professor sol fer el commit automàtic!
+            # Si tot ha anat bé, guardem els canvis a la bd's
             self.commit()
 
+    # Mètode abstracte: les classes filles OBLIGATÒRIAMENT han d'implementar-lo.
     @abstractmethod
     def commit(self):
         pass
 
+    # Mètode abstracte: les classes filles OBLIGATÒRIAMENT han d'implementar-lo.
     @abstractmethod
     def rollback(self):
         pass
 
-#La nostra Unit of work s'encarrega que tot el que fem en una sessió de base de dades "vagi junt" o no es guarda res.
+
+# Implementació UoW amb SQLAlchemy.Fa que tot el que fem en una sessió "vagi junt" o no es guardi res.
 class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
+
     def __init__(self, session: Session):
-        # Aquest 'session_factory' és el que ens permetrà crear sessions noves
-        self.session=session
+        # Guardem la sessió. La compartiran tots els repositoris creats dins d'aquest UoW.
+        self.session = session
 
-    #Mètode que obre la sessió
+    # En entrar a bloc "with", creem tots els repositoris passant-los la sessió.
+    # Com que tots fan servir mateixa sessió, totes les operacions formen part de mateixa transacció i es guarden o descarten juntes.
     def __enter__(self):
-        # Aquí instanciem els repositoris passant-los la sessió que acabem de crear
-        self.employees = EmployeeRepository(self.session)
-        self.menus = MenuRepository(self.session)
-        self.dishes = DishRepository(self.session)
-        self.sales = SaleRepository(self.session)
+        self.employees  = EmployeeRepository(self.session)
+        self.menus      = MenuRepository(self.session)
+        self.dishes     = DishRepository(self.session)
+        self.sales      = SaleRepository(self.session)
         self.categories = CategoryRepository(self.session)
-        self.allergens = AllergenRepository(self.session)
-
+        self.allergens  = AllergenRepository(self.session)
         return super().__enter__()
 
-    #Mètode que assegura que la base de dades no es quedi "penjada". Si hi ha un error (excepció) fa un rollback automatic per seguretat i tanca sessió passi el que passi.
+    # En sortir del bloc "with", cridem lògica del pare (commit o rollback).
+    # Tanquem la sessió a bloc finally assegurant que es tanca sempre, tant si hi ha error o no.
     def __exit__(self, exc_type, exc_value, traceback):
         try:
-            # Cridem a la lògica de l'__exit__ de la classe pare (commit/rollback)
             super().__exit__(exc_type, exc_value, traceback)
         finally:
-            # SEMPRE tanquem la sessió al final
+            # sempre tanquem la sessió per alliberar la connexió a la bd's
             self.session.close()
 
-    #Guarda canvis de forma manual
+    # Guarda tots els canvis pendents de la sessió a la bs's.
     def commit(self):
         self.session.commit()
 
-    #Cancela els canvis de forma manual
+    # Descarta tots els canvis pendents de la sessió sense guardar res.
     def rollback(self):
         self.session.rollback()
 
+# Factory crea instàncies de SqlAlchemyUnitOfWork.
+# Encapsula la creació del motor i de les sessions per simplificar ús.
 class UnitOfWorkFactory:
+
     def __init__(self, database_url: str):
-        # Creem el motor de la base de dades
+        # Creem el motor de la bd's a partir de la URL de connexió
         self.engine = create_engine(database_url)
-        # Configurem com es crearan les sessions
+
+        # Configurem les sessions amb les opcions necessàries:
         self.session_class = sessionmaker(
-            bind=self.engine,
-            autoflush=False,
-            autocommit=False,
-            expire_on_commit=False,
+            bind=self.engine, # Lliga sessionmaker al motor creat.
+            autoflush=False, # No enviem canvis a la bd's fins al commit.
+            autocommit=False, # Canvis no es guarden automàticament, necessitem commit().
+            expire_on_commit=False, # Després de commit, podem llegir objectes (els seus atributs) sense nova sessió.
         )
 
+    # Crea una sessió nova i la injecta dins d'un SqlAlchemyUnitOfWork nou.
+    # Cada crida a create() genera una sessió independent.
     def create(self) -> SqlAlchemyUnitOfWork:
-        # Aquest mètode crea una sessió nova i la injecta en un nou UoW
         return SqlAlchemyUnitOfWork(self.session_class())
