@@ -3,9 +3,9 @@
 # SQLAlchemy tradueix les operacions Python a SQL automàticament.
 
 from .db import Base, engine
-from sqlalchemy import Integer, String, Date, Boolean, Numeric, Table, Column, ForeignKey
+from sqlalchemy import Integer, String, Date, Boolean, Numeric, Table, Column, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
 
@@ -34,6 +34,13 @@ class Employee(Base):
         back_populates="employee", cascade="all, delete-orphan"
     )
 
+    last_update: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+
     def __repr__(self):
         return f"Employee(id={self.id}, name='{self.name}', role='{self.role}')"
 
@@ -57,6 +64,13 @@ class AppCredential(Base):
     # Relació inversa cap Employee per poder accedir a l'empleat des de les credencials
     employee: Mapped["Employee"] = relationship(back_populates="credentials")
 
+    last_update: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+
     def __repr__(self):
         return f"AppCredential(id_employee={self.id_employee}, email='{self.email}')"
 
@@ -74,6 +88,13 @@ class Category(Base):
     dishes: Mapped[list["Dish"]] = relationship(
         # cascade="all, delete-orphan": Si eliminem categoria, eliminem els seus plats.
         back_populates="category", cascade="all, delete-orphan"
+    )
+
+    last_update: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
     )
 
     def __repr__(self):
@@ -129,6 +150,13 @@ class Dish(Base):
         secondary=menu_dish, back_populates="dishes"
     )
 
+    last_update: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+
     def __repr__(self):
         return f"Dish(id={self.id}, name='{self.dish_name}')"
 
@@ -144,6 +172,13 @@ class Allergen(Base):
     # Relació N:M inversa amb Dish a través de taula intermèdia dish_allergen
     dishes: Mapped[list["Dish"]] = relationship(
         secondary=dish_allergen, back_populates="allergens"
+    )
+
+    last_update: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
     )
 
     def __repr__(self):
@@ -171,6 +206,13 @@ class Menu(Base):
         back_populates="menu", cascade="all, delete-orphan"
     )
 
+    last_update: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+
     def __repr__(self):
         return f"Menu(id={self.id}, name='{self.menu_name}', price={self.price})"
 
@@ -192,6 +234,13 @@ class Sale(Base):
     # Relacions inverses per accedir al menú i a l'empleat des d'una venda
     menu: Mapped["Menu"] = relationship(back_populates="sales")
     employee: Mapped["Employee"] = relationship(back_populates="sales")
+
+    last_update: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
 
     def __repr__(self):
         return f"Sale(menu={self.id_menu}, emp={self.id_employee}, date={self.sale_date})"

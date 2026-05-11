@@ -13,7 +13,7 @@ from .models import (
     Allergen
 )
 from typing import Generic, TypeVar
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, and_
 
 # TypeVar permet definir tipus genèrics.
 K = TypeVar("K") # K: Tipus de la clau primària (normalment int, però tuple per a Sale)
@@ -129,14 +129,14 @@ class EmployeeRepository(Repository[int, Employee]):
         super().add(employee)
 
     # Cerca per nom o cognom amb cerca parcial insensible a majúscules.
-    def get_by_name(self, name: str, surname: str) -> list[Employee]:
+    def get_by_name(self, name: str = "", surname: str = "") -> list[Employee]:
+        conditions = []
+        if name:
+            conditions.append(Employee.name.ilike(f"%{name}%"))
+        if surname:
+            conditions.append(Employee.surname.ilike(f"%{surname}%"))
         return self.session.scalars(
-            select(Employee).where(
-                or_(
-                    Employee.name.ilike(f"%{name}%"),
-                    Employee.surname.ilike(f"%{surname}%")
-                )
-            )
+            select(Employee).where(and_(*conditions))
         ).all()
 
     # Filtra els empleats per rol ()"Cambrer", "Cuiner", "Encarregat"...).
