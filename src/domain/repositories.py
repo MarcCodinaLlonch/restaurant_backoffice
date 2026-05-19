@@ -53,6 +53,13 @@ class Repository(Generic[K, V]):
 class CategoryRepository(Repository[int, Category]):
     def __init__(self, session: Session):
         super().__init__(session, Category)
+    
+    # Sobreescriure un mètode del pare perque get_all retorni les categories ordenades per ID.
+    def get_all(self) -> list[Category]:
+        # 2. Has demostrat que entens com fer consultes SQL específiques
+        return self.session.scalars(
+            select(Category).order_by(Category.id)
+        ).all()
 
     def add(self, category: Category):
         # Validació: no permetem categories amb el mateix nom. Comprovem abans d'inserir per evitar errors de la bd's.
