@@ -38,20 +38,20 @@ def menu_categories(factory: UnitOfWorkFactory):
 def list_categories(factory: UnitOfWorkFactory):
     console.print("\n[bold]--- Llistat de Categories ---[/bold]")
     
-    # 1. Obrim transacció a la BD
+    #1.Obrim transacció a la BD
     with factory.create() as uow:
-        # 2. Fem servir el teu Repositori per treure-ho tot
+        #2.Fem servir el teu Repositori per treure-ho tot
         categories = uow.categories.get_all()
         
         if not categories:
             console.print("[yellow]No hi ha cap categoria a la base de dades.[/yellow]")
         else:
-            # 3. Creem una taula visual amb Rich
+            #3.Creem una taula visual amb Rich
             table = Table(show_header=True, header_style="bold magenta")
             table.add_column("ID", style="dim", width=5)
             table.add_column("Nom de la Categoria")
             
-            # 4. Omplim la taula
+            #4.Omplim la taula
             for cat in categories:
                 table.add_row(str(cat.id), cat.category_name)
                 

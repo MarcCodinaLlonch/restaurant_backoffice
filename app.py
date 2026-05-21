@@ -1,10 +1,16 @@
+#Importem Rich per millorar la visualització del menú i el banner
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 from rich import box
 
+#Importem els submenús
 from src.ui.category_ui import menu_categories
-
+from src.ui.employee_ui import menu_employees
+from src.ui.allergen_ui import menu_allergens
+from src.ui.dish_ui import menu_dishes
+from src.ui.menu_ui import menu_menus
+from src.ui.sale_ui import menu_sales
 
 # Importem la Factory i la configuració que ja tens creada
 from src.domain.unit_of_work import UnitOfWorkFactory
@@ -12,7 +18,7 @@ from src.domain.config import DB_URL
 
 # Inicialitzem Rich
 console = Console()
-
+    
 # Funció nova per imprimir el banner
 def print_banner():
     try:
@@ -43,14 +49,21 @@ def main_menu(uow_factory: UnitOfWorkFactory): #passem uow al menu principal per
         
         opcio = console.input("\n[bold yellow]Selecciona una opció:[/bold yellow] ")
         
-        if opcio == "2":
+        if opcio == "1":
+            menu_employees(uow_factory)
+        elif opcio == "2":
             menu_categories(uow_factory)
+        elif opcio == "3":
+            menu_dishes(uow_factory)
+        elif opcio == "4":
+            menu_allergens(uow_factory)
+        elif opcio == "5":
+            menu_menus(uow_factory)
+        elif opcio == "6":
+            menu_sales(uow_factory)
         elif opcio == "0":
             console.print("[green]Fins aviat![/green]")
             break
-        elif opcio in ["1", "3", "4", "5", "6"]:
-            console.print("[red]Encara no implementat[/red]")
-            console.input("Prem Enter per continuar...")
         else:
             console.print("[red]Opció no vàlida.[/red]")
             console.input("Prem Enter per continuar...")
