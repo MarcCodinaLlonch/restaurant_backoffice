@@ -86,6 +86,12 @@ class AllergenRepository(Repository[int, Allergen]):
     def __init__(self, session: Session):
         super().__init__(session, Allergen)
 
+    # get_all sobreescrit perquè retorni els al·lèrgens ordenats per ID.
+    def get_all(self) -> list[Allergen]:
+        return self.session.scalars(
+            select(Allergen).order_by(Allergen.id)
+        ).all()
+
     # Cerca per nom exacte.
     def get_by_name(self, name: str) -> Allergen | None:
         return self.session.scalars(
@@ -96,6 +102,12 @@ class AllergenRepository(Repository[int, Allergen]):
 class DishRepository(Repository[int, Dish]):
     def __init__(self, session: Session):
         super().__init__(session, Dish)
+
+    # get_all sobreescrit perquè retorni els plats ordenats per ID.
+    def get_all(self) -> list[Dish]:
+        return self.session.scalars(
+            select(Dish).order_by(Dish.id)
+        ).all()
 
     # Retorna només els plats que estan marcats com a actius (is_active = True).
     def get_active_dishes(self) -> list[Dish]:
@@ -128,6 +140,12 @@ class DishRepository(Repository[int, Dish]):
 class EmployeeRepository(Repository[int, Employee]):
     def __init__(self, session: Session):
         super().__init__(session, Employee)
+
+    # get_all sobreescrit perquè retorni els empleats ordenats per ID.
+    def get_all(self) -> list[Employee]:
+        return self.session.scalars(
+            select(Employee).order_by(Employee.id)
+        ).all()
 
     def add(self, employee: Employee):
         # Validació: DNI és únic, no podem tenir dos empleats amb el mateix.
@@ -168,6 +186,12 @@ class EmployeeRepository(Repository[int, Employee]):
 class MenuRepository(Repository[int, Menu]):
     def __init__(self, session: Session):
         super().__init__(session, Menu)
+
+    # get_all sobreescrit perquè retorni els menús ordenats per ID.
+    def get_all(self) -> list[Menu]:
+        return self.session.scalars(
+            select(Menu).order_by(Menu.id)
+        ).all()
 
     # Cerca parcial per nom de menú, insensible a majúscules.
     def get_by_name(self, name: str) -> list[Menu]:

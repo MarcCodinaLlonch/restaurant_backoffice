@@ -1,4 +1,4 @@
-# 🍽️ Assignment — Restaurant BackOffice
+# 🍽️ Restaurant BackOffice
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![SQLAlchemy](https://img.shields.io/badge/ORM-SQLAlchemy-red.svg)](https://www.sqlalchemy.org/)
