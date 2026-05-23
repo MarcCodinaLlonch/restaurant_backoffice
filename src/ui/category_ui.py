@@ -11,11 +11,12 @@ console = Console()
 def menu_categories(factory: UnitOfWorkFactory):
     while True:
         console.clear()
+        console.print() # Fix pel PowerShell del VS Code que talla la part superior
         console.print(Panel.fit("[bold magenta]Gestió de Categories[/bold magenta]", border_style="magenta", box=box.DOUBLE))
-        console.print("1. Llistar Categories (Read)")
-        console.print("2. Afegir Categoria (Create)")
-        console.print("3. Modificar Categoria (Update)") # Encara no funciona
-        console.print("4. Eliminar Categoria (Delete)") # Encara no funciona
+        console.print("1. Llistar Categories") #(Read)
+        console.print("2. Afegir Categoria") #(Create)
+        console.print("3. Modificar Categoria") #(Update)
+        console.print("4. Eliminar Categoria") #(Delete)
         console.print("0. Tornar al menú principal")
         
         opcio = console.input("\n[bold yellow]Selecciona una opció:[/bold yellow] ")
@@ -35,7 +36,7 @@ def menu_categories(factory: UnitOfWorkFactory):
             console.input("Prem Enter per continuar...")
 
 #Mètode per opció 1. Llistar categories
-def list_categories(factory: UnitOfWorkFactory):
+def list_categories(factory: UnitOfWorkFactory, pause: bool = True):
     console.print("\n[bold]--- Llistat de Categories ---[/bold]")
     
     #1.Obrim transacció a la BD
@@ -57,7 +58,8 @@ def list_categories(factory: UnitOfWorkFactory):
                 
             console.print(table)
             
-    console.input("\nPrem Enter per continuar...")
+    if pause:
+        console.input("\nPrem Enter per continuar...")
 
 #Mètode per opció 2. Afegir categoria
 def add_category(factory: UnitOfWorkFactory):
@@ -87,6 +89,7 @@ def add_category(factory: UnitOfWorkFactory):
 # Mètode per opció 3. Modificar categoria
 def update_category(factory: UnitOfWorkFactory):
         console.print("\n[bold]--- Modificar Categoria ---[/bold]")
+        list_categories(factory, pause=False)
 
         # Llegim l'ID com a text i validem amb .isdigit() abans de convertir-lo a int().
         # Evita que l'aplicació peti amb un ValueError si l'usuari tecleja lletres.
@@ -130,6 +133,8 @@ def update_category(factory: UnitOfWorkFactory):
 # Mètode per opció 4. Eliminar categoria
 def delete_category(factory: UnitOfWorkFactory):
     console.print("\n[bold]--- Eliminar Categoria ---[/bold]")
+    list_categories(factory, pause=False)
+    
     cat_id_str = console.input("Introdueix l'ID de la categoria a eliminar: ")
     
     if not cat_id_str.isdigit():

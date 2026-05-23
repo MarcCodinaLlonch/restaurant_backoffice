@@ -12,6 +12,7 @@ console = Console()
 def menu_allergens(factory: UnitOfWorkFactory):
     while True:
         console.clear()
+        console.print() # Fix pel PowerShell del VS Code que talla la part superior
         console.print(Panel.fit("[bold yellow]Gestió d'Al·lèrgens[/bold yellow]", border_style="yellow", box=box.DOUBLE))
         console.print("1. Llistar Al·lèrgens")
         console.print("2. Afegir Al·lèrgen")
@@ -36,7 +37,7 @@ def menu_allergens(factory: UnitOfWorkFactory):
             console.input("Prem Enter per continuar...")
 
 #Mètode per opció 1. Llistar al·lèrgens
-def list_allergens(factory: UnitOfWorkFactory):
+def list_allergens(factory: UnitOfWorkFactory, pause: bool = True):
     console.print("\n[bold]--- Llistat d'Al·lèrgens ---[/bold]")
 
     with factory.create() as uow:
@@ -54,7 +55,8 @@ def list_allergens(factory: UnitOfWorkFactory):
 
             console.print(table)
 
-    console.input("\nPrem Enter per continuar...")
+    if pause:
+        console.input("\nPrem Enter per continuar...")
 
 #Mètode per opció 2. Afegir al·lèrgen
 def add_allergen(factory: UnitOfWorkFactory):
@@ -79,7 +81,7 @@ def add_allergen(factory: UnitOfWorkFactory):
 #Mètode per opció 3. Modificar al·lèrgen
 def update_allergen(factory: UnitOfWorkFactory):
     console.print("\n[bold]--- Modificar Al·lèrgen ---[/bold]")
-    list_allergens(factory)
+    list_allergens(factory, pause=False)
 
     #Llegim com a text i validem amb .isdigit() abans de convertir-lo a int()
     #Això evita que l'aplicació peti amb un ValueError si l'usuari tecleja lletres.
@@ -112,7 +114,7 @@ def update_allergen(factory: UnitOfWorkFactory):
 #Mètode per opció 4. Eliminar al·lèrgen
 def delete_allergen(factory: UnitOfWorkFactory):
     console.print("\n[bold]--- Eliminar Al·lèrgen ---[/bold]")
-    list_allergens(factory)
+    list_allergens(factory, pause=False)
 
     al_id_str = console.input("Introdueix l'ID de l'al·lèrgen a eliminar: ")
     if not al_id_str.isdigit():

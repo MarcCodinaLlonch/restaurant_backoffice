@@ -12,10 +12,11 @@ console = Console()
 def menu_dishes(factory: UnitOfWorkFactory):
     while True:
         console.clear()
+        console.print() # Fix pel PowerShell del VS Code que talla la part superior
         console.print(Panel.fit("[bold cyan]Gestió de Plats[/bold cyan]", border_style="cyan", box=box.DOUBLE))
         console.print("1. Llistar tots els plats")
-        console.print("2. Afegir nou plat (1:N amb Categoria)")
-        console.print("3. Veure detall d'un plat (N:M amb Al·lèrgens)")
+        console.print("2. Afegir nou plat") #(1:N amb Categoria)
+        console.print("3. Veure detall d'un plat") #(N:M amb Al·lèrgens)
         console.print("4. Modificar plat")
         console.print("5. Eliminar plat")
         console.print("6. Afegir al·lèrgen a un plat (N:M)")
@@ -49,7 +50,7 @@ def menu_dishes(factory: UnitOfWorkFactory):
 
 
 # Opció 1: Llista tots els plats mostrant la seva categoria (RELACIÓ 1:N)
-def list_dishes(factory: UnitOfWorkFactory):
+def list_dishes(factory: UnitOfWorkFactory, pause: bool = True):
     console.print("\n[bold]--- Llistat de Plats ---[/bold]")
 
     with factory.create() as uow:
@@ -83,7 +84,8 @@ def list_dishes(factory: UnitOfWorkFactory):
 
             console.print(table)
 
-    console.input("\nPrem Enter per continuar...")
+    if pause:
+        console.input("\nPrem Enter per continuar...")
 
 
 # Opció 2: Afegir plat. Demostra RELACIÓ 1:N: l'usuari ha de seleccionar una categoria existent.
@@ -182,7 +184,7 @@ def view_dish_detail(factory: UnitOfWorkFactory):
             console.print(info_table)
 
             # --- RELACIÓ N:M amb Allergen ---
-            console.print("\n[bold cyan]Al·lèrgens (relació N:M amb dish_allergen):[/bold cyan]")
+            console.print("\n[bold cyan]Al·lèrgens d'aquest plat:[/bold cyan]") #(relació N:M amb dish_allergen)
 
             if not dish.allergens:
                 console.print("[yellow]Aquest plat no té cap al·lèrgen assignat.[/yellow]")
@@ -202,7 +204,7 @@ def view_dish_detail(factory: UnitOfWorkFactory):
 # Opció 4: Modificar les dades bàsiques del plat
 def update_dish(factory: UnitOfWorkFactory):
     console.print("\n[bold]--- Modificar Plat ---[/bold]")
-    list_dishes(factory)
+    list_dishes(factory, pause=False)
 
     dish_id_str = console.input("Introdueix l'ID del plat a modificar: ")
     if not dish_id_str.isdigit():
@@ -243,7 +245,7 @@ def update_dish(factory: UnitOfWorkFactory):
 # Opció 5: Eliminar un plat
 def delete_dish(factory: UnitOfWorkFactory):
     console.print("\n[bold]--- Eliminar Plat ---[/bold]")
-    list_dishes(factory)
+    list_dishes(factory, pause=False)
 
     dish_id_str = console.input("Introdueix l'ID del plat a eliminar: ")
     if not dish_id_str.isdigit():
@@ -339,7 +341,6 @@ def add_allergen_to_dish(factory: UnitOfWorkFactory):
 
             if resultat:
                 console.print(f"\n[green]✓ Al·lèrgen '{allergen.allergen_name}' afegit al plat '{dish.dish_name}'![/green]")
-                console.print("[dim](SQLAlchemy ha inserit automàticament la fila a la taula intermèdia dish_allergen)[/dim]")
             else:
                 console.print(f"[yellow]L'al·lèrgen '{allergen.allergen_name}' ja estava assignat a aquest plat.[/yellow]")
 

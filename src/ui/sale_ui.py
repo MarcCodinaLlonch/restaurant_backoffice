@@ -3,6 +3,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich import box
+from sqlalchemy.exc import IntegrityError
 
 from src.domain.unit_of_work import UnitOfWorkFactory
 from src.domain.models import Sale
@@ -13,10 +14,10 @@ console = Console()
 def menu_sales(factory: UnitOfWorkFactory):
     while True:
         console.clear()
+        console.print() # Fix pel PowerShell del VS Code que talla la part superior
         console.print(Panel.fit("[bold red]Gestió de Vendes[/bold red]", border_style="red", box=box.DOUBLE))
-        console.print("[dim]Relació N:M amb atributs: Menu ↔ Employee (amb date i quantity)[/dim]\n")
         console.print("1. Llistar totes les vendes")
-        console.print("2. Registrar nova venda (N:M amb atributs)")
+        console.print("2. Registrar nova venda") #(N:M amb atributs)
         console.print("3. Eliminar venda")
         console.print("4. Cercar vendes per data")
         console.print("5. Cercar vendes per empleat")
@@ -59,7 +60,9 @@ def _print_sales_table(sales):
         return
 
     table = Table(show_header=True, header_style="bold red")
+    table.add_column("ID Menú", style="dim", width=7)
     table.add_column("Menú", style="magenta")
+    table.add_column("ID Empleat", style="dim", width=10)
     table.add_column("Empleat")
     table.add_column("Data")
     #Columna de l'ATRIBUT EXTRA que fa que sigui N:M amb atributs (no simple)
@@ -70,7 +73,9 @@ def _print_sales_table(sales):
         nom_menu = sale.menu.menu_name if sale.menu else str(sale.id_menu) #Si no troba el menú (per algun error), mostra l'ID en lloc del nom
         nom_empleat = f"{sale.employee.name} {sale.employee.surname}" if sale.employee else str(sale.id_employee) #Si no troba l'empleat, mostra l'ID en lloc del nom
         table.add_row(
+            str(sale.id_menu),
             nom_menu,
+            str(sale.id_employee),
             nom_empleat,
             str(sale.sale_date),
             str(sale.quantity_sold)
@@ -81,7 +86,7 @@ def _print_sales_table(sales):
 
 
 #Mètode opció 1. Llista totes les vendes paginades
-def list_sales(factory: UnitOfWorkFactory):
+def list_sales(factory: UnitOfWorkFactory, pause: bool = True):
     console.print("\n[bold]--- Llistat de Vendes ---[/bold]")
 
     with factory.create() as uow:
@@ -89,7 +94,8 @@ def list_sales(factory: UnitOfWorkFactory):
         sales = uow.sales.get_paginated(page=1, page_size=20)
         _print_sales_table(sales)
 
-    console.input("\nPrem Enter per continuar...")
+    if pause:
+        console.input("\nPrem Enter per continuar...")
 
 
 #Mètode opció 2. Registrar nova venda. Demostra la relació N:M amb atributs.
@@ -97,94 +103,103 @@ def list_sales(factory: UnitOfWorkFactory):
 def add_sale(factory: UnitOfWorkFactory):
     console.print("\n[bold]--- Nova Venda (N:M amb atributs) ---[/bold]")
 
-    with factory.create() as uow:
-        #Buscar els menús i empleats disponibles per mostrar-los i seleccionar-los. Això demostra la N:M entre Menu i Employee.
-        menus = uow.menus.get_all()
-        if not menus:
-            console.print("[red]No hi ha cap menú. Crea'n un primer.[/red]")
-            console.input("Prem Enter per continuar...")
-            return
+    creada = False
 
-        console.print("\n[bold]Menús disponibles:[/bold]")
-        m_table = Table(show_header=True, header_style="bold magenta")
-        m_table.add_column("ID", style="dim", width=5)
-        m_table.add_column("Nom")
-        m_table.add_column("Preu", justify="right")
-        for m in menus:
-            m_table.add_row(str(m.id), m.menu_name, f"{m.price}€")
-        console.print(m_table)
-
-        #Seleccionar el menú, demanant l'ID i validant que sigui un número. 
-        # No validem que l'ID existeixi perquè després quan intentem crear la venda, si el menú no existeix, 
-        # saltarà un error que atraparem i mostrarem.
-        menu_id_str = console.input("\nID del menú venut: ")
-        if not menu_id_str.isdigit():
-            console.print("[red]L'ID ha de ser un número.[/red]")
-            console.input("Prem Enter per continuar...")
-            return
-        menu_id = int(menu_id_str)
-
-        #Buscar els empleats disponibles per mostrar-los i seleccionar-los. Això demostra la N:M entre Menu i Employee.
-        employees = uow.employees.get_all()
-        if not employees:
-            console.print("[red]No hi ha cap empleat. Crea'n un primer.[/red]")
-            console.input("Prem Enter per continuar...")
-            return
-
-        console.print("\n[bold]Empleats disponibles:[/bold]")
-        e_table = Table(show_header=True, header_style="bold green")
-        e_table.add_column("ID", style="dim", width=5)
-        e_table.add_column("Nom")
-        e_table.add_column("Rol")
-        for emp in employees:
-            e_table.add_row(str(emp.id), f"{emp.name} {emp.surname}", emp.role)
-        console.print(e_table)
-
-        #Seleccionar l'empleat, demanant l'ID i validant que sigui un número.
-        emp_id_str = console.input("\nID de l'empleat que fa la venda: ")
-        if not emp_id_str.isdigit():
-            console.print("[red]L'ID ha de ser un número.[/red]")
-            console.input("Prem Enter per continuar...")
-            return
-        emp_id = int(emp_id_str)
-
-        #Introduir atributs de la relació, el que la fa N:M amb atributs.
-        # Data: La data de la venda per defecte és avui, però es pot introduir una data concreta. Validem el format de la data.
-        data_str = console.input("\nData de la venda (YYYY-MM-DD) [Enter per avui]: ")
-        if not data_str.strip():
-            data_venda = date.today()
-        else:
-            try:
-                data_venda = date.fromisoformat(data_str)
-            except ValueError:
-                console.print("[red]Format de data incorrecte. Usa YYYY-MM-DD.[/red]")
+    try:
+        with factory.create() as uow:
+            #Buscar els menús i empleats disponibles per mostrar-los i seleccionar-los. Això demostra la N:M entre Menu i Employee.
+            menus = uow.menus.get_all()
+            if not menus:
+                console.print("[red]No hi ha cap menú. Crea'n un primer.[/red]")
                 console.input("Prem Enter per continuar...")
                 return
 
-        # Quantitat: La quantitat venuda, per defecte 1, però es pot introduir qualsevol quantitat. Validem que sigui un número positiu.
-        quantitat_str = console.input("Quantitat venuda [1]: ")
-        if not quantitat_str.strip():
-            quantitat = 1
-        elif quantitat_str.isdigit() and int(quantitat_str) > 0:
-            quantitat = int(quantitat_str)
-        else:
-            console.print("[red]La quantitat ha de ser un número positiu.[/red]")
-            console.input("Prem Enter per continuar...")
-            return
+            console.print("\n[bold]Menús disponibles:[/bold]")
+            m_table = Table(show_header=True, header_style="bold magenta")
+            m_table.add_column("ID", style="dim", width=5)
+            m_table.add_column("Nom")
+            m_table.add_column("Preu", justify="right")
+            for m in menus:
+                m_table.add_row(str(m.id), m.menu_name, f"{m.price}€")
+            console.print(m_table)
 
-        # Creem objecte Sale: és la taula d'associació N:M amb els seus atributs extra
-        try:
-            nova_venda = Sale(
-                id_menu=menu_id,
-                id_employee=emp_id,
-                sale_date=data_venda,
-                quantity_sold=quantitat
-            )
-            uow.sales.add(nova_venda)
-            console.print(f"\n[green]✓ Venda registrada correctament![/green]")
-            console.print(f"[dim]Menú ID {menu_id} | Empleat ID {emp_id} | Data: {data_venda} | Quantitat: {quantitat}[/dim]")
-        except Exception as e:
-            console.print(f"[bold red]Error:[/bold red] {e}")
+            #Seleccionar el menú, demanant l'ID i validant que sigui un número. 
+            # No validem que l'ID existeixi perquè després quan intentem crear la venda, si el menú no existeix, 
+            # saltarà un error que atraparem i mostrarem.
+            menu_id_str = console.input("\nID del menú venut: ")
+            if not menu_id_str.isdigit():
+                console.print("[red]L'ID ha de ser un número.[/red]")
+                console.input("Prem Enter per continuar...")
+                return
+            menu_id = int(menu_id_str)
+
+            #Buscar els empleats disponibles per mostrar-los i seleccionar-los. Això demostra la N:M entre Menu i Employee.
+            employees = uow.employees.get_all()
+            if not employees:
+                console.print("[red]No hi ha cap empleat. Crea'n un primer.[/red]")
+                console.input("Prem Enter per continuar...")
+                return
+
+            console.print("\n[bold]Empleats disponibles:[/bold]")
+            e_table = Table(show_header=True, header_style="bold green")
+            e_table.add_column("ID", style="dim", width=5)
+            e_table.add_column("Nom")
+            e_table.add_column("Rol")
+            for emp in employees:
+                e_table.add_row(str(emp.id), f"{emp.name} {emp.surname}", emp.role)
+            console.print(e_table)
+
+            #Seleccionar l'empleat, demanant l'ID i validant que sigui un número.
+            emp_id_str = console.input("\nID de l'empleat que fa la venda: ")
+            if not emp_id_str.isdigit():
+                console.print("[red]L'ID ha de ser un número.[/red]")
+                console.input("Prem Enter per continuar...")
+                return
+            emp_id = int(emp_id_str)
+
+            #Introduir atributs de la relació, el que la fa N:M amb atributs.
+            # Data: La data de la venda per defecte és avui, però es pot introduir una data concreta. Validem el format de la data.
+            data_str = console.input("\nData de la venda (YYYY-MM-DD) [Enter per avui]: ")
+            if not data_str.strip():
+                data_venda = date.today()
+            else:
+                try:
+                    data_venda = date.fromisoformat(data_str)
+                except ValueError:
+                    console.print("[red]Format de data incorrecte. Usa YYYY-MM-DD.[/red]")
+                    console.input("Prem Enter per continuar...")
+                    return
+
+            # Quantitat: La quantitat venuda, per defecte 1, però es pot introduir qualsevol quantitat. Validem que sigui un número positiu.
+            quantitat_str = console.input("Quantitat venuda [1]: ")
+            if not quantitat_str.strip():
+                quantitat = 1
+            elif quantitat_str.isdigit() and int(quantitat_str) > 0:
+                quantitat = int(quantitat_str)
+            else:
+                console.print("[red]La quantitat ha de ser un número positiu.[/red]")
+                console.input("Prem Enter per continuar...")
+                return
+
+            # Creem objecte Sale: és la taula d'associació N:M amb els seus atributs extra
+            try:
+                nova_venda = Sale(
+                    id_menu=menu_id,
+                    id_employee=emp_id,
+                    sale_date=data_venda,
+                    quantity_sold=quantitat
+                )
+                uow.sales.add(nova_venda)
+                creada = True
+            except Exception as e:
+                console.print(f"[bold red]Error:[/bold red] {e}")
+
+    except IntegrityError:
+        console.print("\n[bold red]Error:[/bold red] Ja existeix una venda per aquest menú, empleat i data. La combinació ha de ser única.")
+
+    if creada:
+        console.print(f"\n[green]✓ Venda registrada correctament![/green]")
+        console.print(f"[dim]Menú ID {menu_id} | Empleat ID {emp_id} | Data: {data_venda} | Quantitat: {quantitat}[/dim]")
 
     console.input("\nPrem Enter per continuar...")
 
@@ -193,11 +208,18 @@ def add_sale(factory: UnitOfWorkFactory):
 def delete_sale(factory: UnitOfWorkFactory):
     console.print("\n[bold]--- Eliminar Venda ---[/bold]")
     console.print("[dim]La venda s'identifica per la combinació de Menú + Empleat + Data[/dim]\n")
+    list_sales(factory, pause=False)
 
-    #Otenim PK composta amb id menú, id empleat i data. Validem que els IDs siguin números i que la data tingui el format correcte.
-    menu_id_str = console.input("ID del menú: ")
-    emp_id_str  = console.input("ID de l'empleat: ")
-    data_str    = console.input("Data (YYYY-MM-DD): ")
+    from src.ui.menu_ui import list_menus
+    from src.ui.employee_ui import list_employees
+
+    list_menus(factory, pause=False)
+    menu_id_str = console.input("\nID del menú: ")
+    
+    list_employees(factory, pause=False)
+    emp_id_str  = console.input("\nID de l'empleat: ")
+    
+    data_str    = console.input("\nData (YYYY-MM-DD): ")
 
     if not menu_id_str.isdigit() or not emp_id_str.isdigit():
         console.print("[red]Els IDs han de ser números.[/red]")
@@ -330,11 +352,18 @@ def search_by_date_range(factory: UnitOfWorkFactory):
 def update_sale(factory: UnitOfWorkFactory):
     console.print("\n[bold]--- Modificar Venda ---[/bold]")
     console.print("[dim]Només es pot modificar la quantitat d'una venda ja existent.[/dim]\n")
+    list_sales(factory, pause=False)
 
-    #Per identificar la venda a modificar, necessitem la PK composta: id_menu + id_employee + sale_date
-    menu_id_str = console.input("ID del menú: ")
-    emp_id_str  = console.input("ID de l'empleat: ")
-    data_str    = console.input("Data (YYYY-MM-DD): ")
+    from src.ui.menu_ui import list_menus
+    from src.ui.employee_ui import list_employees
+
+    list_menus(factory, pause=False)
+    menu_id_str = console.input("\nID del menú: ")
+
+    list_employees(factory, pause=False)
+    emp_id_str  = console.input("\nID de l'empleat: ")
+
+    data_str    = console.input("\nData (YYYY-MM-DD): ")
 
     if not menu_id_str.isdigit() or not emp_id_str.isdigit():
         console.print("[red]Els IDs han de ser números.[/red]")

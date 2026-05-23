@@ -2,6 +2,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich import box
+from sqlalchemy.exc import IntegrityError
 
 from src.domain.unit_of_work import UnitOfWorkFactory
 from src.domain.models import Employee, AppCredential
@@ -13,6 +14,7 @@ console = Console()
 def menu_employees(factory: UnitOfWorkFactory):
     while True:
         console.clear()
+        console.print() # Fix pel PowerShell del VS Code que talla la part superior
         console.print(Panel.fit("[bold green]Gestió d'Empleats[/bold green]", border_style="green", box=box.DOUBLE))
         console.print("1. Llistar tots els empleats")
         console.print("2. Afegir nou empleat (amb credencials opcionals)")
@@ -46,7 +48,7 @@ def menu_employees(factory: UnitOfWorkFactory):
             console.input("Prem Enter per continuar...")
 
 #Mètode per opció 1. Llistar empleats (indicant de si tenen credencials o no) -> Relació 1:1 amb AppCredential
-def list_employees(factory: UnitOfWorkFactory):
+def list_employees(factory: UnitOfWorkFactory, pause: bool = True):
     console.print("\n[bold]--- Llistat d'Empleats ---[/bold]")
 
     with factory.create() as uow:
@@ -78,7 +80,8 @@ def list_employees(factory: UnitOfWorkFactory):
 
             console.print(table)
 
-    console.input("\nPrem Enter per continuar...")
+    if pause:
+        console.input("\nPrem Enter per continuar...")
 
 #Mètode per opció 2. Afegir empleat (amb opció d'afegir credencials a l'app, relació 1:1)
 #Si es creen les credencials, s'han de guardar en la mateixa transacció que l'empleat garantint integritat de les dades.
@@ -96,44 +99,59 @@ def add_employee(factory: UnitOfWorkFactory):
         console.input("Prem Enter per continuar...")
         return
 
-    with factory.create() as uow:
-        try:
-            #1.Creem l'empleat
-            nou_empleat = Employee(
-                name=nom,
-                surname=cognom,
-                national_id=dni,
-                role=rol
-            )
-            uow.employees.add(nou_empleat)
+    # Flag per saber si la transacció ha anat bé i mostrar el missatge d'èxit
+    # fora del bloc 'with', quan el commit ja s'ha executat sense errors.
+    creat = False
 
-            #2.Preguntem si vol afegir credencials d'accés (RELACIÓ 1:1)
-            console.print("\n[cyan]Vols afegir credencials d'accés a l'app per aquest empleat?[/cyan]")
-            vol_credencials = console.input("(s/n): ").lower()
+    try:
+        with factory.create() as uow:
+            try:
+                #1.Creem l'empleat
+                nou_empleat = Employee(
+                    name=nom,
+                    surname=cognom,
+                    national_id=dni,
+                    role=rol
+                )
+                uow.employees.add(nou_empleat)
 
-            if vol_credencials == "s":
-                email = console.input("Email: ")
-                password = console.input("Contrasenya: ")
+                #2.Preguntem si vol afegir credencials d'accés (RELACIÓ 1:1)
+                console.print("\n[cyan]Vols afegir credencials d'accés a l'app per aquest empleat?[/cyan]")
+                vol_credencials = console.input("(s/n): ").lower()
 
-                if not email.strip() or not password.strip():
-                    console.print("[red]Email i contrasenya no poden estar buits. Es crearà l'empleat sense credencials.[/red]")
-                else:
-                    #Fem un hash SHA256 de la contrasenya. Mai guardem contrasenyes en text pla!
-                    password_hash = hashlib.sha256(password.encode()).hexdigest()
+                if vol_credencials == "s":
+                    email = console.input("Email: ")
+                    password = console.input("Contrasenya: ")
 
-                    #Creem les credencials i les assignem directament a l'empleat.
-                    #SQLAlchemy s'encarrega de posar l'id_employee automàticament per la relació 1:1.
-                    nou_empleat.credentials = AppCredential(
-                        email=email,
-                        password_hash=password_hash
-                    )
+                    if not email.strip() or not password.strip():
+                        console.print("[red]Email i contrasenya no poden estar buits. Es crearà l'empleat sense credencials.[/red]")
+                    else:
+                        #Fem un hash SHA256 de la contrasenya. Mai guardem contrasenyes en text pla!
+                        password_hash = hashlib.sha256(password.encode()).hexdigest()
 
-            #Tot el que hi ha dins d'aquest 'with' (empleat + credencials) 
-            # es guarda en una sola transacció al fer commit al final.
-            console.print(f"\n[green]✓ Empleat '{nom} {cognom}' creat amb èxit![/green]")
+                        #Creem les credencials i les assignem directament a l'empleat.
+                        #SQLAlchemy s'encarrega de posar l'id_employee automàticament per la relació 1:1.
+                        nou_empleat.credentials = AppCredential(
+                            email=email,
+                            password_hash=password_hash
+                        )
 
-        except ValueError as e:
-            console.print(f"\n[bold red]Error:[/bold red] {e}")
+                # Marquem que tot ha anat bé dins del bloc Python.
+                # El commit real passa al __exit__ del UoW en sortir del 'with'.
+                creat = True
+
+            except ValueError as e:
+                # Captura errors de validació del repositori (ex: DNI duplicat)
+                console.print(f"\n[bold red]Error:[/bold red] {e}")
+
+    except IntegrityError:
+        # Captura errors de la BD que arriben al commit (ex: email ja existent a app_credential)
+        console.print("\n[bold red]Error:[/bold red] Ja existeix un compte amb aquest email. Prova amb un altre email.")
+
+    # El missatge d'èxit es mostra AQUÍ, fora del 'with', quan el commit
+    # ja s'ha executat correctament i no hi ha hagut cap IntegrityError.
+    if creat:
+        console.print(f"\n[green]✓ Empleat '{nom} {cognom}' creat amb èxit![/green]")
 
     console.input("\nPrem Enter per continuar...")
 
@@ -191,7 +209,7 @@ def update_employee(factory: UnitOfWorkFactory):
     console.print("\n[bold]--- Modificar Empleat ---[/bold]")
 
     #Llistem empleats perquè l'usuari sàpiga quins IDs existeixen
-    list_employees(factory)
+    list_employees(factory, pause=False)
 
     #Validem que ID sigui un número enter abans de fer consulta a la bd's
     emp_id_str = console.input("Introdueix l'ID de l'empleat a modificar: ")
@@ -233,7 +251,7 @@ def delete_employee(factory: UnitOfWorkFactory):
     console.print("\n[bold]--- Eliminar Empleat ---[/bold]")
 
     #Llistem empleats perquè l'usuari sàpiga quines ID existeixen
-    list_employees(factory)
+    list_employees(factory, pause=False)
 
     #Validem que ID sigui un número enter abans de fer consulta a la bd's
     emp_id_str = console.input("Introdueix l'ID de l'empleat a eliminar: ")

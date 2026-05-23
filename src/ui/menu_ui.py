@@ -11,14 +11,15 @@ console = Console()
 def menu_menus(factory: UnitOfWorkFactory):
     while True:
         console.clear()
+        console.print() # Fix pel PowerShell del VS Code que talla la part superior
         console.print(Panel.fit("[bold magenta]Gestió de Menús[/bold magenta]", border_style="magenta", box=box.DOUBLE))
         console.print("1. Llistar tots els menús")
         console.print("2. Afegir nou menú")
-        console.print("3. Veure detall d'un menú (N:M amb Plats)")
+        console.print("3. Veure detall d'un menú") #(N:M amb Plats)
         console.print("4. Modificar menú")
         console.print("5. Eliminar menú")
-        console.print("6. Afegir plat a un menú (N:M)")
-        console.print("7. Eliminar plat d'un menú (N:M)")
+        console.print("6. Afegir plat a un menú") #(N:M)
+        console.print("7. Eliminar plat d'un menú") #(N:M)
         console.print("8. Cercar per nom")
         console.print("9. Filtrar per rang de preus")
         console.print("0. Tornar al menú principal")
@@ -51,7 +52,7 @@ def menu_menus(factory: UnitOfWorkFactory):
 
 
 #Mètode per opció 1. Llista tots els menús mostrant quants plats té cada un (RELACIÓ N:M)
-def list_menus(factory: UnitOfWorkFactory):
+def list_menus(factory: UnitOfWorkFactory, pause: bool = True):
     console.print("\n[bold]--- Llistat de Menús ---[/bold]")
 
     with factory.create() as uow:
@@ -77,7 +78,8 @@ def list_menus(factory: UnitOfWorkFactory):
 
             console.print(table)
 
-    console.input("\nPrem Enter per continuar...")
+    if pause:
+        console.input("\nPrem Enter per continuar...")
 
 
 #Mètode per opció 2: Afegir un nou menú sense plats inicialment, s'afegeixen amb opció 6
@@ -134,7 +136,7 @@ def view_menu_detail(factory: UnitOfWorkFactory):
             console.print(Panel.fit(f"[bold magenta]Menú #{m.id}: {m.menu_name} — {m.price}€[/bold magenta]", border_style="magenta"))
 
             # --- RELACIÓ N:M amb Dish ---
-            console.print("\n[bold magenta]Plats d'aquest menú (relació N:M a través de menu_dish):[/bold magenta]")
+            console.print("\n[bold magenta]Plats d'aquest menú:[/bold magenta]") #(relació N:M a través de menu_dish)
 
             if not m.dishes:
                 console.print("[yellow]Aquest menú no té cap plat assignat.[/yellow]")
@@ -160,7 +162,7 @@ def update_menu(factory: UnitOfWorkFactory):
     console.print("\n[bold]--- Modificar Menú ---[/bold]")
 
     #Mostrem llistat de menús per ajudar a l'usuari a triar quin vol modificar
-    list_menus(factory)
+    list_menus(factory, pause=False)
 
     menu_id_str = console.input("Introdueix l'ID del menú a modificar: ")
     if not menu_id_str.isdigit():
@@ -200,7 +202,7 @@ def update_menu(factory: UnitOfWorkFactory):
 def delete_menu(factory: UnitOfWorkFactory):
     console.print("\n[bold]--- Eliminar Menú ---[/bold]")
 
-    list_menus(factory)
+    list_menus(factory, pause=False)
 
     menu_id_str = console.input("Introdueix l'ID del menú a eliminar: ")
     if not menu_id_str.isdigit():
@@ -297,7 +299,6 @@ def add_dish_to_menu(factory: UnitOfWorkFactory):
             # SQLAlchemy insereix la fila a menu_dish automàticament
             uow.menus.add_dish_to_menu(menu_id, dish)
             console.print(f"\n[green]✓ Plat '{dish.dish_name}' afegit al menú '{m.menu_name}'![/green]")
-            console.print("[dim](<SQLAlchemy ha inserit automàticament la fila a la taula intermèdia menu_dish>)[/dim]")
 
     console.input("\nPrem Enter per continuar...")
 
