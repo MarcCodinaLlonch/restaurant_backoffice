@@ -1,38 +1,40 @@
-# Documentació del Protocol de Comunicació (TCP REST-Inspired)
+# Communication Protocol Specification (REST-Inspired over TCP)
 
-## Restaurant BackOffice — Versió 2.0.0
+> 🌐 **Language:** **English (PROTOCOL.md / PROTOCOL_ENG.md)** | [Català (PROTOCOL_CAT.md)](PROTOCOL_CAT.md)
 
-Aquest document descriu l'especificació completa del protocol d'aplicació utilitzat per a la comunicació entre el **Client** i el **Servidor** del sistema de gestió de restaurants.
+## Restaurant BackOffice — Version 2.0.0
 
----
-
-## 1. Visió General i Fonaments Teòrics
-
-El protocol està inspirat en **HTTP/1.1 REST** implementat directament sobre la capa de transport **TCP (Transmission Control Protocol)** mitjançant sockets bloquejants en Python.
-
-### Per què no utilitzar Pickle de Python?
-Pickle permet serialitzar objectes natius de Python fàcilment, però presenta greus problemes de seguretat (execució remota de codi maliciós en deserialitzar dades no confiables) i genera un acoblament estricte entre les versions i llenguatges del client i del servidor.
-
-### Solució adoptada:
-1. **Format de text amb codificació UTF-8**: Missatges llegibles per humans i interoperables amb qualsevol tecnologia o llenguatge futur.
-2. **Serialització de dades en JSON**: Totes les càrregues útils (payloads) viatgen en format JSON estàndard.
-3. **Delimitació de missatges**:
-   - Cada línia de capçalera finalitza amb la seqüència estàndard CRLF (`\r\n`).
-   - El final de les capçaleres es determina amb una línia buida (`\r\n\r\n`).
-   - Si la petició o la resposta conté un cos (body), la capçalera `Content-Length` indica exactament quants bytes s'han de llegir del socket.
-4. **Model Stateless (Sense estat)**: Cada petició és atòmica i independent. El client obre una connexió TCP, envia la petició, rep la resposta i es tanca la connexió (`Connection: close`).
+This document defines the complete technical specification of the application-level communication protocol established between the **Client** and the **Server** of the restaurant management system.
 
 ---
 
-## 2. Format dels Missatges
+## 1. Overview and Theoretical Foundations
 
-### 2.1 Format de la Petició (Request)
+The protocol is inspired by **HTTP/1.1 REST**, implemented directly on top of the **TCP (Transmission Control Protocol)** transport layer using blocking sockets provided by Python's standard `socket` library.
 
-Una petició consta de:
-1. **Línia de petició (Request Line)**: `<MÈTODE> <RUTA_RECURS> <VERSIÓ_PROTOCOL>\r\n`
-2. **Capçaleres (Headers)**: Una o més línies `<Clau>: <Valor>\r\n`
-3. **Separador de capçaleres**: Línia buida `\r\n`
-4. **Cos (Body)**: Dades JSON en UTF-8 (opcional, requerit en POST i PUT).
+### Why not Python's Pickle?
+While Python's native `pickle` module allows straightforward object serialization, it introduces critical security vulnerabilities (arbitrary remote code execution when unpickling untrusted inputs) and couples both ends strictly to Python runtimes and specific class versions.
+
+### Adopted Solution:
+1. **Plain-Text Encoding with UTF-8:** Human-readable messages and universal interoperability across diverse programming languages and platforms.
+2. **JSON Serialization:** All payloads and domain models are serialized as standard JSON objects.
+3. **Stream Framing and Message Delimitation:**
+   - Every header line terminates with standard CRLF (`\r\n`).
+   - The end of the header section is explicitly marked by an empty line (`\r\n\r\n`).
+   - When a message carries a body (in POST or PUT requests, or responses), the `Content-Length` header indicates the exact byte size to read from the socket.
+4. **Stateless Connection Model:** Each request is atomic and independent. The client connects over TCP, sends the formatted request, awaits the response, and the connection is closed (`Connection: close`).
+
+---
+
+## 2. Message Wire Format
+
+### 2.1 Request Format
+
+An incoming request consists of:
+1. **Request Line:** `<METHOD> <RESOURCE_PATH> <PROTOCOL_VERSION>\r\n`
+2. **Headers:** One or more lines in `<Key>: <Value>\r\n` format.
+3. **Header Terminator:** An empty line `\r\n`.
+4. **Body:** UTF-8 encoded JSON string (optional for GET/DELETE, required for POST/PUT).
 
 ```http
 POST /categories HTTP/1.1\r\n
@@ -41,16 +43,16 @@ Accept: application/json\r\n
 Content-Type: application/json; charset=utf-8\r\n
 Content-Length: 29\r\n
 \r\n
-{"category_name": "Postres"}
+{"category_name": "Desserts"}
 ```
 
-### 2.2 Format de la Resposta (Response)
+### 2.2 Response Format
 
-Una resposta consta de:
-1. **Línia d'estat (Status Line)**: `<VERSIÓ_PROTOCOL> <CODI_ESTAT> <TEXT_ESTAT>\r\n`
-2. **Capçaleres (Headers)**: Informació del tipus de contingut i longitud.
-3. **Separador de capçaleres**: Línia buida `\r\n`
-4. **Cos (Body)**: Dades JSON en UTF-8 (si s'escau).
+An outgoing response consists of:
+1. **Status Line:** `<PROTOCOL_VERSION> <STATUS_CODE> <STATUS_TEXT>\r\n`
+2. **Headers:** Content metadata and payload length.
+3. **Header Terminator:** An empty line `\r\n`.
+4. **Body:** UTF-8 encoded JSON string.
 
 ```http
 HTTP/1.1 201 Created\r\n
@@ -58,179 +60,179 @@ Connection: close\r\n
 Content-Type: application/json; charset=utf-8\r\n
 Content-Length: 38\r\n
 \r\n
-{"id": 4, "category_name": "Postres"}
+{"id": 4, "category_name": "Desserts"}
 ```
 
 ---
 
-## 3. Codis d'Estat i Gestió d'Errors
+## 3. Status Codes and Error Handling
 
-| Codi | Nom | Significat |
+| Code | Status Text | Description |
 | :--- | :--- | :--- |
-| **200** | OK | Petició processada correctament. Retorna dades en format JSON. |
-| **201** | Created | Recurs creat amb èxit a la base de dades. Retorna el recurs creat amb el seu ID assignat. |
-| **204** | No Content | Operació realitzada amb èxit (ex: DELETE). No retorna cos. |
-| **400** | Bad Request | Dades invàlides enviades pel client (nom buit, preu negatiu, format incorrecte). |
-| **404** | Not Found | El recurs sol·licitat no existeix a la base de dades o la ruta és desconeguda. |
-| **500** | Internal Server Error | Error inesperat durant l'execució al servidor. |
-| **503** | Service Unavailable | Retornat pel client quan el servidor TCP no és accessible. |
+| **200** | OK | Request processed successfully. Returns the requested JSON data. |
+| **201** | Created | Resource created successfully in the database. Returns the newly created entity with its assigned ID. |
+| **204** | No Content | Action executed successfully (e.g., DELETE). Returns no response body. |
+| **400** | Bad Request | Client validation failure (e.g., empty name, negative price, duplicate unique key). |
+| **404** | Not Found | Requested resource ID does not exist or route is unrecognized. |
+| **500** | Internal Server Error | Unhandled server exception during request processing. |
+| **503** | Service Unavailable | Returned by client when the TCP server is unreachable. |
 
-En cas d'error (4xx o 5xx), el cos de la resposta sempre conté un objecte JSON amb la clau `"error"`:
+In the event of an error (4xx or 5xx), the response body consistently returns a JSON object with an `"error"` key:
 ```json
 {
-  "error": "El nom de la categoria no pot estar buit."
+  "error": "Category name cannot be empty."
 }
 ```
 
 ---
 
-## 4. Recursos i Operacions Suportades
+## 4. Supported Resources and Operations
 
 ### 4.1 Categories (`/categories`)
 
-| Mètode | Ruta | Descripció | Cos Petició (JSON) | Codi Resposta |
+| Method | Path | Description | Request Body (JSON) | Response Code |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/categories` | Llistar totes les categories | Cap | `200 OK` |
-| `GET` | `/categories/{id}` | Obtenir categoria per ID | Cap | `200 OK` / `404` |
-| `POST` | `/categories` | Crear una nova categoria | `{"category_name": "string"}` | `201 Created` / `400` |
-| `PUT` | `/categories/{id}` | Modificar categoria | `{"category_name": "string"}` | `200 OK` / `404` |
-| `DELETE` | `/categories/{id}` | Eliminar categoria | Cap | `204 No Content` / `404` |
+| `GET` | `/categories` | List all categories | None | `200 OK` |
+| `GET` | `/categories/{id}` | Retrieve category by ID | None | `200 OK` / `404` |
+| `POST` | `/categories` | Create new category | `{"category_name": "string"}` | `201 Created` / `400` |
+| `PUT` | `/categories/{id}` | Update category | `{"category_name": "string"}` | `200 OK` / `404` |
+| `DELETE` | `/categories/{id}` | Delete category | None | `204 No Content` / `404` |
 
 ---
 
-### 4.2 Al·lèrgens (`/allergens`)
+### 4.2 Allergens (`/allergens`)
 
-| Mètode | Ruta | Descripció | Cos Petició (JSON) | Codi Resposta |
+| Method | Path | Description | Request Body (JSON) | Response Code |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/allergens` | Llistar tots els al·lèrgens | Cap | `200 OK` |
-| `GET` | `/allergens/{id}` | Obtenir al·lèrgen per ID | Cap | `200 OK` / `404` |
-| `POST` | `/allergens` | Crear un nou al·lèrgen | `{"allergen_name": "string"}` | `201 Created` / `400` |
-| `PUT` | `/allergens/{id}` | Modificar al·lèrgen | `{"allergen_name": "string"}` | `200 OK` / `404` |
-| `DELETE` | `/allergens/{id}` | Eliminar al·lèrgen | Cap | `204 No Content` / `404` |
+| `GET` | `/allergens` | List all allergens | None | `200 OK` |
+| `GET` | `/allergens/{id}` | Retrieve allergen by ID | None | `200 OK` / `404` |
+| `POST` | `/allergens` | Create new allergen | `{"allergen_name": "string"}` | `201 Created` / `400` |
+| `PUT` | `/allergens/{id}` | Update allergen | `{"allergen_name": "string"}` | `200 OK` / `404` |
+| `DELETE` | `/allergens/{id}` | Delete allergen | None | `204 No Content` / `404` |
 
 ---
 
-### 4.3 Plats (`/dishes`)
+### 4.3 Dishes (`/dishes`)
 
-| Mètode | Ruta | Descripció | Cos Petició (JSON) | Codi Resposta |
+| Method | Path | Description | Request Body (JSON) | Response Code |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/dishes` | Llistar plats (admet `?active=true` o `?name=text`) | Cap | `200 OK` |
-| `GET` | `/dishes/{id}` | Obtenir plat per ID (amb al·lèrgens N:M) | Cap | `200 OK` / `404` |
-| `POST` | `/dishes` | Crear nou plat (relació 1:N amb categoria) | `{"dish_name": "string", "id_category": int, "description": "str", "is_active": bool}` | `201 Created` / `400` |
-| `PUT` | `/dishes/{id}` | Modificar plat | Camps a modificar en JSON | `200 OK` / `404` |
-| `DELETE` | `/dishes/{id}` | Eliminar plat | Cap | `204 No Content` / `404` |
-| `POST` | `/dishes/{id}/allergens` | Afegir al·lèrgen a plat (relació N:M) | `{"id_allergen": int}` | `200 OK` / `400` |
+| `GET` | `/dishes` | List dishes (supports `?active=true` or `?name=text`) | None | `200 OK` |
+| `GET` | `/dishes/{id}` | Retrieve dish by ID (with N:M allergens) | None | `200 OK` / `404` |
+| `POST` | `/dishes` | Create dish (1:N relationship with category) | `{"dish_name": "str", "id_category": int, "description": "str", "is_active": bool}` | `201 Created` / `400` |
+| `PUT` | `/dishes/{id}` | Update dish attributes | JSON fields to update | `200 OK` / `404` |
+| `DELETE` | `/dishes/{id}` | Delete dish | None | `204 No Content` / `404` |
+| `POST` | `/dishes/{id}/allergens` | Add allergen to dish (N:M relationship) | `{"id_allergen": int}` | `200 OK` / `400` |
 
 ---
 
-### 4.4 Empleats (`/employees`)
+### 4.4 Employees (`/employees`)
 
-| Mètode | Ruta | Descripció | Cos Petició (JSON) | Codi Resposta |
+| Method | Path | Description | Request Body (JSON) | Response Code |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/employees` | Llistar tots els empleats (admet `?role=rol` o `?name=x&surname=y`) | Cap | `200 OK` |
-| `GET` | `/employees/{id}` | Obtenir empleat per ID | Cap | `200 OK` / `404` |
-| `POST` | `/employees` | Crear empleat (i credencials 1:1 opcionals) | `{"name": "str", "surname": "str", "national_id": "str", "role": "str", "email": "str", "password": "str"}` | `201 Created` / `400` |
-| `PUT` | `/employees/{id}` | Modificar empleat | Camps a modificar en JSON | `200 OK` / `404` |
-| `DELETE` | `/employees/{id}` | Eliminar empleat (esborrat en cascada) | Cap | `204 No Content` / `404` |
+| `GET` | `/employees` | List employees (supports `?role=rol` or `?name=x&surname=y`) | None | `200 OK` |
+| `GET` | `/employees/{id}` | Retrieve employee by ID | None | `200 OK` / `404` |
+| `POST` | `/employees` | Create employee (and optional 1:1 credentials) | `{"name": "str", "surname": "str", "national_id": "str", "role": "str", "email": "str", "password": "str"}` | `201 Created` / `400` |
+| `PUT` | `/employees/{id}` | Update employee | JSON fields to update | `200 OK` / `404` |
+| `DELETE` | `/employees/{id}` | Delete employee (cascade deletion) | None | `204 No Content` / `404` |
 
 ---
 
-### 4.5 Menús (`/menus`)
+### 4.5 Menus (`/menus`)
 
-| Mètode | Ruta | Descripció | Cos Petició (JSON) | Codi Resposta |
+| Method | Path | Description | Request Body (JSON) | Response Code |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/menus` | Llistar menús (admet `?name=x` o `?min_price=x&max_price=y`) | Cap | `200 OK` |
-| `GET` | `/menus/{id}` | Obtenir menú per ID (amb llista de plats N:M) | Cap | `200 OK` / `404` |
-| `POST` | `/menus` | Crear nou menú | `{"menu_name": "string", "price": float}` | `201 Created` / `400` |
-| `PUT` | `/menus/{id}` | Modificar menú | Camps a modificar en JSON | `200 OK` / `404` |
-| `DELETE` | `/menus/{id}` | Eliminar menú | Cap | `204 No Content` / `404` |
-| `POST` | `/menus/{id}/dishes` | Afegir plat a menú (relació N:M) | `{"id_dish": int}` | `200 OK` / `400` |
-| `DELETE` | `/menus/{id}/dishes/{dish_id}` | Eliminar plat d'un menú | Cap | `204 No Content` / `404` |
+| `GET` | `/menus` | List menus (supports `?name=x` or `?min_price=x&max_price=y`) | None | `200 OK` |
+| `GET` | `/menus/{id}` | Retrieve menu by ID (with N:M dishes) | None | `200 OK` / `404` |
+| `POST` | `/menus` | Create new menu | `{"menu_name": "string", "price": float}` | `201 Created` / `400` |
+| `PUT` | `/menus/{id}` | Update menu | JSON fields to update | `200 OK` / `404` |
+| `DELETE` | `/menus/{id}` | Delete menu | None | `204 No Content` / `404` |
+| `POST` | `/menus/{id}/dishes` | Add dish to menu (N:M relationship) | `{"id_dish": int}` | `200 OK` / `400` |
+| `DELETE` | `/menus/{id}/dishes/{dish_id}` | Remove dish from menu | None | `204 No Content` / `404` |
 
 ---
 
-### 4.6 Vendes (`/sales`)
+### 4.6 Sales (`/sales`)
 
-| Mètode | Ruta | Descripció | Cos Petició (JSON) | Codi Resposta |
+| Method | Path | Description | Request Body (JSON) | Response Code |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/sales` | Llistar vendes (admet `?page=1`, `?date=YYYY-MM-DD`, `?employee_id=X`, `?menu_id=Y`, `?date_from=A&date_to=B`) | Cap | `200 OK` |
-| `GET` | `/sales/{menu_id}/{emp_id}/{date}` | Obtenir venda per PK composta | Cap | `200 OK` / `404` |
-| `POST` | `/sales` | Enregistrar venda (N:M amb atributs) | `{"id_menu": int, "id_employee": int, "sale_date": "YYYY-MM-DD", "quantity_sold": int}` | `201 Created` / `400` |
-| `PUT` | `/sales/{menu_id}/{emp_id}/{date}` | Actualitzar quantitat venuda | `{"quantity_sold": int}` | `200 OK` / `400` / `404` |
-| `DELETE` | `/sales/{menu_id}/{emp_id}/{date}` | Eliminar venda per PK composta | Cap | `204 No Content` / `404` |
+| `GET` | `/sales` | List sales (supports `?page=1`, `?date=YYYY-MM-DD`, `?employee_id=X`, `?menu_id=Y`, `?date_from=A&date_to=B`) | None | `200 OK` |
+| `GET` | `/sales/{menu_id}/{emp_id}/{date}` | Retrieve sale by composite PK | None | `200 OK` / `404` |
+| `POST` | `/sales` | Register sale (N:M with attributes) | `{"id_menu": int, "id_employee": int, "sale_date": "YYYY-MM-DD", "quantity_sold": int}` | `201 Created` / `400` |
+| `PUT` | `/sales/{menu_id}/{emp_id}/{date}` | Update quantity sold | `{"quantity_sold": int}` | `200 OK` / `400` / `404` |
+| `DELETE` | `/sales/{menu_id}/{emp_id}/{date}` | Delete sale by composite PK | None | `204 No Content` / `404` |
 
 ---
 
-## 5. Exemples Reals d'Operacions CRUD
+## 5. End-to-End CRUD Examples
 
-### 5.1 Create (Crear Categoria)
-**Petició Client:**
+### 5.1 Create Entity (POST /categories)
+**Client Request:**
 ```
 POST /categories HTTP/1.1
 Host: 127.0.0.1:8080
 Accept: application/json
 Content-Type: application/json; charset=utf-8
-Content-Length: 30
+Content-Length: 28
 
-{"category_name": "Amanides"}
+{"category_name": "Salads"}
 ```
-**Resposta Servidor:**
+**Server Response:**
 ```
 HTTP/1.1 201 Created
 Connection: close
 Content-Type: application/json; charset=utf-8
-Content-Length: 39
+Content-Length: 37
 
-{"id": 1, "category_name": "Amanides"}
+{"id": 1, "category_name": "Salads"}
 ```
 
-### 5.2 Read / List (Llistar Plats Actius)
-**Petició Client:**
+### 5.2 Read Entity / List (GET /dishes?active=true)
+**Client Request:**
 ```
 GET /dishes?active=true HTTP/1.1
 Host: 127.0.0.1:8080
 Accept: application/json
 Connection: close
 ```
-**Resposta Servidor:**
+**Server Response:**
 ```
 HTTP/1.1 200 OK
 Connection: close
 Content-Type: application/json; charset=utf-8
-Content-Length: 135
+Content-Length: 133
 
-[{"id": 1, "dish_name": "Amanida Cèsar", "description": "Enciam fresc i salsa cèsar", "is_active": true, "id_category": 1, "category_name": "Amanides", "allergens": []}]
+[{"id": 1, "dish_name": "Caesar Salad", "description": "Fresh lettuce & dressing", "is_active": true, "id_category": 1, "category_name": "Salads", "allergens": []}]
 ```
 
-### 5.3 Update (Modificar Menú)
-**Petició Client:**
+### 5.3 Update Entity (PUT /menus/1)
+**Client Request:**
 ```
 PUT /menus/1 HTTP/1.1
 Host: 127.0.0.1:8080
 Accept: application/json
 Content-Type: application/json; charset=utf-8
-Content-Length: 38
+Content-Length: 37
 
-{"menu_name": "Menú Migdia", "price": 14.50}
+{"menu_name": "Lunch Menu", "price": 14.50}
 ```
-**Resposta Servidor:**
+**Server Response:**
 ```
 HTTP/1.1 200 OK
 Connection: close
 Content-Type: application/json; charset=utf-8
-Content-Length: 58
+Content-Length: 57
 
-{"id": 1, "menu_name": "Menú Migdia", "price": 14.5, "dishes": []}
+{"id": 1, "menu_name": "Lunch Menu", "price": 14.5, "dishes": []}
 ```
 
-### 5.4 Delete (Eliminar Al·lèrgen)
-**Petició Client:**
+### 5.4 Delete Entity (DELETE /allergens/3)
+**Client Request:**
 ```
 DELETE /allergens/3 HTTP/1.1
 Host: 127.0.0.1:8080
 Connection: close
 ```
-**Resposta Servidor:**
+**Server Response:**
 ```
 HTTP/1.1 204 No Content
 Connection: close

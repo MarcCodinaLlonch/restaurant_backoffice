@@ -1,5 +1,6 @@
 # Documentació d'Estudi, Repàs i Arquitectura — Restaurant BackOffice v2.0
 
+> 🌐 **Idioma:** [English (PROJECT_DOCUMENTATION_ENG.md)](PROJECT_DOCUMENTATION_ENG.md) | **Català (PROJECT_DOCUMENTATION_CAT.md)**  
 > **Guia completa per a estudiants de 2n de DAM (Desenvolupament d'Aplicacions Multiplataforma)**  
 > Mòduls implicats: M0486 (Accés a Dades), M0487 (Programació de Serveis i Processos) i M0488 (Sistemes de Gestió Empresarial).
 
@@ -146,8 +147,12 @@ restaurant_backoffice/
 │   ├── test_router.py               # Tests d'enrutament
 │   └── test_client_server_integration.py # Prova real de socket TCP Client-Servidor
 │
-├── PROTOCOL.md                      # Documentació formal del protocol d'aplicació
-├── DOCUMENTACIO_PROJECTE.md         # Aquest document d'estudi i referència
+├── PROTOCOL_ENG.md                  # Especificació tècnica del protocol (Anglès)
+├── PROTOCOL_CAT.md                  # Especificació tècnica del protocol (Català)
+├── PROJECT_DOCUMENTATION_ENG.md     # Documentació d'estudi i arquitectura (Anglès)
+├── PROJECT_DOCUMENTATION_CAT.md     # Documentació d'estudi i arquitectura (Català)
+├── EXECUTION_GUIDE_ENG.md           # Guia d'execució i proves (Anglès)
+├── EXECUTION_GUIDE_CAT.md           # Guia d'execució i proves (Català)
 ├── pyproject.toml                   # Configuració de pytest
 └── requirements.txt                 # Dependències del projecte
 ```
@@ -252,22 +257,12 @@ En una finestra de terminal:
 ```bash
 python server/server.py
 ```
-Veurem:
-```
-============================================================
- RESTAURANT BACKOFFICE — SERVIDOR TCP EN EXECUCIÓ
- Escoltant a: http://0.0.0.0:8080/
- Protocol: HTTP/1.1 REST sobre TCP (Sockets bloquejants)
- Prem Ctrl+C per aturar el servidor.
-============================================================
-```
 
 ### Pas 5: Iniciar el Client
 En una altra finestra de terminal:
 ```bash
 python client/client.py
 ```
-S'obrirà el menú interactiu Rich amb el bàner i les 6 opcions de gestió.
 
 ---
 
