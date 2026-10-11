@@ -176,7 +176,7 @@ sequenceDiagram
 
     Usuari->>UI: Tria opció "1. Llistar Categories"
     UI->>Client: client.get("/categories")
-    Client->>Socket: Connecta a 127.0.0.1:8080
+    Client->>Socket: Connecta a 127.0.0.1:8088
     Client->>Socket: Envia: GET /categories HTTP/1.1\r\nHost: ...\r\n\r\n
     Socket->>Server: Reclama bytes i parseja a HttpRequest
     Server->>Service: CategoryService.get_all()

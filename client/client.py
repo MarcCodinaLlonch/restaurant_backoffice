@@ -8,8 +8,14 @@
 import os
 import sys
 
-# Assegurem que l'arrel del projecte és al PYTHONPATH per trobar common i client
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Assegurem que l'arrel del projecte és la primera ruta de sys.path
+# i eliminem el directori 'client' de sys.path perquè Python no confongui el fitxer 'client.py' amb el paquet 'client'
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+if current_dir in sys.path:
+    sys.path.remove(current_dir)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from rich.console import Console
 from rich.panel import Panel
@@ -86,7 +92,7 @@ def main_menu(client: HttpClient):
 if __name__ == "__main__":
     # Obtenim configuració del servidor des de variables d'entorn o valors per defecte
     host = os.getenv("SERVER_HOST", "127.0.0.1")
-    port = int(os.getenv("SERVER_PORT", "8080"))
+    port = int(os.getenv("SERVER_PORT", "8088"))
 
     # Instanciem el client HTTP sobre TCP
     client = HttpClient(host=host, port=port)

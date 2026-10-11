@@ -61,7 +61,7 @@ python server/server.py
 [*] Inicialitzant serveis i connexió a la BD (localhost:5433/restaurant_db_dev)...
 ============================================================
  RESTAURANT BACKOFFICE — SERVIDOR TCP EN EXECUCIÓ
- Escoltant a: http://0.0.0.0:8080/
+ Escoltant a: http://0.0.0.0:8088/
  Protocol: HTTP/1.1 REST sobre TCP (Sockets bloquejants)
  Prem Ctrl+C per aturar el servidor.
 ============================================================
@@ -90,7 +90,7 @@ Apareixerà el bàner ASCII i el menú interactiu Rich:
   //__.....----.....__\|/__.....----.....__\\
 
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Restaurant BackOffice (Client TCP) — Servidor: 127.0.0.1:8080                   ┃
+┃ Restaurant BackOffice (Client TCP) — Servidor: 127.0.0.1:8088                   ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 1. Gestió d'Empleats
 2. Gestió de Categories
@@ -156,7 +156,7 @@ Pots seguir aquest guió per comprovar que tot el cicle de vida de les dades fun
 Com que el teu servidor parla el protocol estàndard HTTP/1.1 sobre TCP, pots obrir una **tercera terminal** i provar-ho sense fer servir el client de Python:
 
 ```bash
-curl -i http://localhost:8080/categories
+curl -i http://localhost:8088/categories
 ```
 
 **Què respon el teu servidor:**

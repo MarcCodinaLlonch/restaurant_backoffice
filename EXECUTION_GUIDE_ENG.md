@@ -61,12 +61,12 @@ python server/server.py
 [*] Inicialitzant serveis i connexió a la BD (localhost:5433/restaurant_db_dev)...
 ============================================================
  RESTAURANT BACKOFFICE — SERVIDOR TCP EN EXECUCIÓ
- Escoltant a: http://0.0.0.0:8080/
+ Escoltant a: http://0.0.0.0:8088/
  Protocol: HTTP/1.1 REST sobre TCP (Sockets bloquejants)
  Prem Ctrl+C per aturar el servidor.
 ============================================================
 ```
-> ⏸️ **Leave this terminal open.** The server is actively waiting for client connections on port `8080`.
+> ⏸️ **Leave this terminal open.** The server is actively waiting for client connections on port `8088`.
 
 ---
 
@@ -90,7 +90,7 @@ The ASCII banner and the interactive Rich menu will render:
   //__.....----.....__\|/__.....----.....__\\
 
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Restaurant BackOffice (Client TCP) — Servidor: 127.0.0.1:8080                   ┃
+┃ Restaurant BackOffice (Client TCP) — Servidor: 127.0.0.1:8088                   ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 1. Gestió d'Empleats
 2. Gestió de Categories
@@ -155,7 +155,7 @@ Follow this walkthrough to verify that full data lifecycles operate over the net
 Because the server implements standard HTTP/1.1 over TCP, you can open a **third terminal** and query the backend directly:
 
 ```bash
-curl -i http://localhost:8080/categories
+curl -i http://localhost:8088/categories
 ```
 
 **Server Response:**

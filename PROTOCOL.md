@@ -38,7 +38,7 @@ An incoming request consists of:
 
 ```http
 POST /categories HTTP/1.1\r\n
-Host: 127.0.0.1:8080\r\n
+Host: 127.0.0.1:8088\r\n
 Accept: application/json\r\n
 Content-Type: application/json; charset=utf-8\r\n
 Content-Length: 29\r\n
@@ -169,7 +169,7 @@ In the event of an error (4xx or 5xx), the response body consistently returns a 
 **Client Request:**
 ```
 POST /categories HTTP/1.1
-Host: 127.0.0.1:8080
+Host: 127.0.0.1:8088
 Accept: application/json
 Content-Type: application/json; charset=utf-8
 Content-Length: 28
@@ -190,7 +190,7 @@ Content-Length: 37
 **Client Request:**
 ```
 GET /dishes?active=true HTTP/1.1
-Host: 127.0.0.1:8080
+Host: 127.0.0.1:8088
 Accept: application/json
 Connection: close
 ```
@@ -208,7 +208,7 @@ Content-Length: 133
 **Client Request:**
 ```
 PUT /menus/1 HTTP/1.1
-Host: 127.0.0.1:8080
+Host: 127.0.0.1:8088
 Accept: application/json
 Content-Type: application/json; charset=utf-8
 Content-Length: 37
@@ -229,7 +229,7 @@ Content-Length: 57
 **Client Request:**
 ```
 DELETE /allergens/3 HTTP/1.1
-Host: 127.0.0.1:8080
+Host: 127.0.0.1:8088
 Connection: close
 ```
 **Server Response:**

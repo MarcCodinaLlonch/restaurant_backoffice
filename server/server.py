@@ -16,8 +16,14 @@ import os
 import sys
 import socket
 
-# Assegurem que l'arrel del projecte és al PYTHONPATH per poder importar common i server
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Assegurem que l'arrel del projecte és la primera ruta de sys.path
+# i eliminem el directori 'server' de sys.path perquè Python no confongui el fitxer 'server.py' amb el paquet 'server'
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+if current_dir in sys.path:
+    sys.path.remove(current_dir)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from server.src.persistence.config import DB_URL, SERVER_HOST, SERVER_PORT
 from server.src.persistence.unit_of_work import UnitOfWorkFactory

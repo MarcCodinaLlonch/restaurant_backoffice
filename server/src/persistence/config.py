@@ -16,4 +16,4 @@ DB_URL = {
 
 # Configuració de la xarxa per al Servidor TCP
 SERVER_HOST = os.getenv("SERVER_HOST", "0.0.0.0")
-SERVER_PORT = int(os.getenv("SERVER_PORT", "8080"))
+SERVER_PORT = int(os.getenv("SERVER_PORT", "8088"))

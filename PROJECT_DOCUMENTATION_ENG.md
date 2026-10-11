@@ -175,7 +175,7 @@ sequenceDiagram
 
     User->>UI: Selects "1. List Categories"
     UI->>Client: client.get("/categories")
-    Client->>Socket: Connects to 127.0.0.1:8080
+    Client->>Socket: Connects to 127.0.0.1:8088
     Client->>Socket: Sends: GET /categories HTTP/1.1\r\nHost: ...\r\n\r\n
     Socket->>Server: Reads stream bytes and parses HttpRequest
     Server->>Service: CategoryService.get_all()

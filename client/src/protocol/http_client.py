@@ -37,7 +37,7 @@ class HttpClient:
     Client TCP que envia peticions HTTP/1.1 al Servidor del Restaurant BackOffice.
     """
 
-    def __init__(self, host: str = "localhost", port: int = 8080, timeout: float = 10.0):
+    def __init__(self, host: str = "localhost", port: int = 8088, timeout: float = 10.0):
         self.host = host
         self.port = port
         self.timeout = timeout

@@ -85,7 +85,7 @@ En una terminal:
 ```bash
 python server/server.py
 ```
-El servidor quedarà escoltant connexions a `0.0.0.0:8080`.
+El servidor quedarà escoltant connexions a `0.0.0.0:8088`.
 
 ### 2. Iniciar el Client
 En una segona terminal:

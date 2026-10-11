@@ -85,7 +85,7 @@ In your first terminal:
 ```bash
 python server/server.py
 ```
-The server will start listening for TCP connections on `0.0.0.0:8080`.
+The server will start listening for TCP connections on `0.0.0.0:8088`.
 
 ### 2. Start the Interactive Client
 In a second terminal:

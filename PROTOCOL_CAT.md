@@ -38,7 +38,7 @@ Una petició consta de:
 
 ```http
 POST /categories HTTP/1.1\r\n
-Host: 127.0.0.1:8080\r\n
+Host: 127.0.0.1:8088\r\n
 Accept: application/json\r\n
 Content-Type: application/json; charset=utf-8\r\n
 Content-Length: 29\r\n
@@ -169,7 +169,7 @@ En cas d'error (4xx o 5xx), el cos de la resposta sempre conté un objecte JSON 
 **Petició Client:**
 ```
 POST /categories HTTP/1.1
-Host: 127.0.0.1:8080
+Host: 127.0.0.1:8088
 Accept: application/json
 Content-Type: application/json; charset=utf-8
 Content-Length: 30
@@ -190,7 +190,7 @@ Content-Length: 39
 **Petició Client:**
 ```
 GET /dishes?active=true HTTP/1.1
-Host: 127.0.0.1:8080
+Host: 127.0.0.1:8088
 Accept: application/json
 Connection: close
 ```
@@ -208,7 +208,7 @@ Content-Length: 135
 **Petició Client:**
 ```
 PUT /menus/1 HTTP/1.1
-Host: 127.0.0.1:8080
+Host: 127.0.0.1:8088
 Accept: application/json
 Content-Type: application/json; charset=utf-8
 Content-Length: 38
@@ -229,7 +229,7 @@ Content-Length: 58
 **Petició Client:**
 ```
 DELETE /allergens/3 HTTP/1.1
-Host: 127.0.0.1:8080
+Host: 127.0.0.1:8088
 Connection: close
 ```
 **Resposta Servidor:**
