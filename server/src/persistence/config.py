@@ -1,0 +1,19 @@
+# config.py: Centralitza la configuració de la base de dades i del servidor.
+# Llegim les variables d'entorn des del fitxer .env.
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+DB_URL = {
+    "development": os.getenv("DB_URL_DEVELOPMENT"),
+    "test":        os.getenv("DB_URL_TESTS"),
+    "production":  os.getenv("DB_URL_PRODUCTION")
+}.get(ENVIRONMENT)
+
+# Configuració de la xarxa per al Servidor TCP
+SERVER_HOST = os.getenv("SERVER_HOST", "0.0.0.0")
+SERVER_PORT = int(os.getenv("SERVER_PORT", "8080"))

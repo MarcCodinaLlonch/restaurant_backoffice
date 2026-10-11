@@ -1,79 +1,109 @@
-# 🍽️ Restaurant BackOffice
+# 🍽️ Restaurant BackOffice — v2.0 (Client/Server Architecture)
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![SQLAlchemy](https://img.shields.io/badge/ORM-SQLAlchemy-red.svg)](https://www.sqlalchemy.org/)
+[![Sockets](https://img.shields.io/badge/Network-TCP%20Sockets-orange.svg)](https://docs.python.org/3/library/socket.html)
 [![Rich](https://img.shields.io/badge/CLI-Rich-blueviolet.svg)](https://rich.readthedocs.io/)
+[![Tests](https://img.shields.io/badge/Tests-Pytest%20Passing-brightgreen.svg)](https://docs.pytest.org/)
 
-## 📖 Description
+## 📖 Descripció del Projecte
 
-This is an interactive console application developed in Python to manage a restaurant's *Back Office*. This academic project is designed following a **Layered Architecture** and strictly implements the **Repository** and **Unit of Work (UoW)** design patterns.
+**Restaurant BackOffice v2.0** és una aplicació completa de gestió interna per a restaurants reestructurada en una **arquitectura Client/Servidor sobre sockets TCP bloquejants**.
 
-The application allows you to manage employees, categories, allergens, dishes, menus, and sales. It demonstrates the complete management of relational databases in a practical and structured way, including 1:1, 1:N, N:M, and N:M relationships with extra attributes. The User Interface (UI) uses the **Rich** library to display tables, panels, and text with a professional format in the terminal.
+Aquesta versió implementa:
+- **Separació de responsabilitats**: El Servidor és l'únic que accedeix a la base de dades (PostgreSQL) mitjançant SQLAlchemy. El Client és completament independent i no té cap dependència d'ORM.
+- **Protocol de comunicació REST-inspired**: Peticions i respostes de tipus text basades en l'estàndard HTTP/1.1 amb càrrega útil en format **JSON** codificat en **UTF-8**.
+- **Capa de Domini Net (Clean Domain)**: Entitats de negoci pures (`@dataclass`) a `common/` que no depenen de tecnologies de persistència.
+- **Capa de Serveis (Service Layer) i Router**: Enrutament de peticions i validació de regles de negoci al servidor.
+- **Unit of Work i Repositoris**: Persistència atòmica de transaccions i aïllament de consultes SQL.
+- **Bateria de Tests**: Cobertura del 100% per a la capa de serveis, validació de peticions, enrutador i comunicació TCP real.
 
-## 👤 Authorship
+---
 
-- **Author:** Marc Codina Llonch
-- **Subject:** M0488 — Multiplatform Application Development (DAM)
+## 👤 Autoria
 
-## 📚 Table of Contents
+- **Autor:** Marc Codina Llonch
+- **Cicle:** Desenvolupament d'Aplicacions Multiplataforma (DAM 2n curs)
+- **Mòduls:** M0486 (Accés a Dades) i M0487 (Programació de Serveis i Processos)
 
-1. [System Requirements](#️-system-requirements)
-2. [Main Features](#-main-features)
-3. [Installation Guide](#-installation-guide)
-4. [User Guide](#-user-guide)
+---
 
-## ⚙️ System Requirements
+## 📚 Documents de Referència
 
-| Requirement | Detail |
+- 📄 **[PROTOCOL.md](PROTOCOL.md)**: Especificació tècnica del protocol de comunicació (formats de missatge, codis d'estat, operacions CRUD i exemples).
+- 📘 **[DOCUMENTACIO_PROJECTE.md](DOCUMENTACIO_PROJECTE.md)**: Guia d'estudi detallada amb conceptes teòrics (sockets, framing, stateless, hashing SHA-256), diagrames de seqüència i preguntes d'examen amb resposta.
+
+---
+
+## ⚙️ Requisits del Sistema
+
+| Requisit | Detall |
 |---|---|
-| Operating System | Windows, macOS, or Linux |
-| Runtime Environment | [Python 3.10 or higher](https://www.python.org/downloads/) |
-| Database | PostgreSQL (Development environment) or SQLite (Test environment) |
+| Sistema Operatiu | Linux, Windows o macOS |
+| Python | 3.10 o superior (provat amb 3.14) |
+| Base de dades | PostgreSQL (gestionada amb Docker Compose) |
 
-## ✨ Main Features
+---
 
-- **Architecture:** Strict separation between the UI (Presentation) and the domain/data. The UI never executes SQL sentences or interacts directly with SQLAlchemy.
-- **Relationship Management:**
-  - **1:1 (Employees ↔ Credentials):** Atomic management of users with secure passwords (SHA-256 hash) and automatic cascade deletion (`delete-orphan`).
-  - **1:N (Categories → Dishes):** Maintenance of referential integrity where a dish must belong to an existing category.
-  - **N:M (Dishes ↔ Allergens / Menus ↔ Dishes):** Advanced use of the ORM to manage intermediate tables transparently using the `.append()` method.
-  - **N:M with attributes (Sales):** Modeling of a specific entity (`Sale`) with a composite primary key `(id_menu, id_employee, sale_date)` and its own attributes (`quantity_sold`).
-- **Secure Transactions:** Use of the **Unit of Work** pattern to ensure that complex operations are saved atomically (either completely saved or rolled back).
-- **User Interface:** Use of **Rich** to generate visual panels, structured data tables, and color-coded status messages.
-- **Defensive Programming:** Input validation in the console (e.g., using `.isdigit()`) to prevent unexpected program crashes.
+## 🚀 Instal·lació i Configuració
 
-## 🚀 Installation Guide
-
-1. **Clone the repository:**
+1. **Clonar el repositori:**
    ```bash
-   git clone <YOUR_REPOSITORY_URL>
+   git clone <URL_DEL_REPOSITORI>
    cd restaurant_backoffice
    ```
-2. **Create and activate a virtual environment:**
+
+2. **Crear i activar l'entorn virtual:**
    ```bash
-   # Windows:
-   python -m venv .venv
-   .venv\Scripts\activate
-   
-   # Linux/macOS:
    python3 -m venv .venv
    source .venv/bin/activate
    ```
-3. **Install the dependencies:**
+
+3. **Instal·lar les dependències:**
    ```bash
    pip install -r requirements.txt
    ```
-4. **Configure the environment:**
-   Make sure to have a `.env` file in the root folder with the `ENVIRONMENT` variable pointing to your environment (e.g., `development` for PostgreSQL or `test` for in-memory SQLite):
-   ```env
-   ENVIRONMENT=development
+
+4. **Arrencar la base de dades amb Docker:**
+   ```bash
+   docker-compose up -d
    ```
 
-## 📖 User Guide
+---
 
-| Action | How to do it |
-|---|---|
-| Start the application | Run `python app.py` in the terminal. |
-| Navigate the menu | Type the number of the desired option and press `Enter`. |
-| Go back | Press `0` from any submenu. |
-| Cancel modifications | Leave the text blank (press `Enter` without text) in the update forms. |
+## 💻 Com executar l'aplicació
+
+### 1. Iniciar el Servidor TCP
+En una terminal:
+```bash
+python server/server.py
+```
+El servidor quedarà escoltant connexions a `0.0.0.0:8080`.
+
+### 2. Iniciar el Client
+En una segona terminal:
+```bash
+python client/client.py
+```
+S'iniciarà la interfície interactiva de terminal amb suport per a totes les operacions de gestió:
+- Gestió d'Empleats (amb credencials xifrades en SHA-256)
+- Gestió de Categories
+- Gestió de Plats (amb al·lèrgens associats)
+- Gestió d'Al·lèrgens
+- Gestió de Menús (amb plats associats)
+- Gestió de Vendes (clau primària composta)
+
+---
+
+## 🧪 Execució de Tests
+
+Per executar la suite completa de proves unitàries i d'integració sobre TCP:
+```bash
+pytest -v
+```
+Totes les 21 proves passaran amb èxit verificant:
+- Parsing i framing de peticions HTTP
+- Construcció de respostes i serialització JSON
+- Enrutament de rutes i control d'errors (400, 404, 500)
+- Lògica de negoci als Serveis mitjançant Mocks
+- Comunicació Client/Servidor TCP real
