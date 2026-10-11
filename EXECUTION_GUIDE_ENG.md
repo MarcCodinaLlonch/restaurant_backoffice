@@ -9,7 +9,7 @@
 
 Ensure your terminal is located at the repository root:
 ```bash
-cd /home/marcc/Projectes/restaurant_backoffice
+cd restaurant_backoffice
 ```
 
 ---

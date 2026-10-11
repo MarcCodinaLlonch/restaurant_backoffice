@@ -9,9 +9,9 @@ load_dotenv()
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
 DB_URL = {
-    "development": os.getenv("DB_URL_DEVELOPMENT"),
-    "test":        os.getenv("DB_URL_TESTS"),
-    "production":  os.getenv("DB_URL_PRODUCTION")
+    "development": os.getenv("DB_URL_DEVELOPMENT", "postgresql://postgres:secretpassword@localhost:5433/restaurant_db_dev"),
+    "test":        os.getenv("DB_URL_TESTS", "sqlite:///:memory:"),
+    "production":  os.getenv("DB_URL_PRODUCTION", "postgresql://postgres:secretpassword@localhost:5433/restaurant_db_prod")
 }.get(ENVIRONMENT)
 
 # Configuració de la xarxa per al Servidor TCP

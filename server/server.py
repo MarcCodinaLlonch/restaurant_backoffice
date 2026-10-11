@@ -70,6 +70,18 @@ def run_server(host: str = SERVER_HOST, port: int = SERVER_PORT, db_url: str = D
         sys.exit(1)
 
     print(f"[*] Inicialitzant serveis i connexió a la BD ({db_url.split('@')[-1] if '@' in db_url else db_url})...")
+    
+    # 1. Assegurem que la BD existeix a PostgreSQL (la crea si és una instal·lació neta)
+    from server.src.persistence.seed import ensure_database_exists, seed_initial_data
+    ensure_database_exists(db_url)
+
+    # 2. Creem les taules de la BD si encara no existeixen
+    from server.src.persistence.db import Base, engine, Session
+    if engine:
+        Base.metadata.create_all(bind=engine)
+        # 3. Població automàtica de dades de prova si la base de dades està buida
+        seed_initial_data(Session)
+
     router = create_router(db_url)
 
     # Creem el socket TCP (AF_INET = IPv4, SOCK_STREAM = TCP)

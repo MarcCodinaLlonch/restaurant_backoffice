@@ -9,7 +9,7 @@
 
 Assegura't de tenir el projecte descarregat i una terminal oberta a la carpeta arrel:
 ```bash
-cd /home/marcc/Projectes/restaurant_backoffice
+cd restaurant_backoffice
 ```
 
 ---

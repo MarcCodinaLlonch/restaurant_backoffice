@@ -54,10 +54,11 @@ Aquesta versió implementa:
 
 ## 🚀 Instal·lació i Configuració
 
-1. **Clonar el repositori:**
+1. **Clonar el repositori i canviar a la versió v2.0.0:**
    ```bash
-   git clone <URL_DEL_REPOSITORI>
+   git clone https://github.com/MarcCodinaLlonch/restaurant_backoffice.git
    cd restaurant_backoffice
+   git checkout v2.0.0
    ```
 
 2. **Crear i activar l'entorn virtual:**
@@ -71,7 +72,12 @@ Aquesta versió implementa:
    pip install -r requirements.txt
    ```
 
-4. **Arrencar la base de dades amb Docker:**
+4. **Configurar les variables d'entorn (opcional, valors per defecte a punt):**
+   ```bash
+   cp .env.example .env
+   ```
+
+5. **Arrencar la base de dades amb Docker:**
    ```bash
    docker-compose up -d
    ```

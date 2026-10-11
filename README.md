@@ -54,10 +54,11 @@ This version implements:
 
 ## 🚀 Installation & Setup
 
-1. **Clone the repository:**
+1. **Clone the repository and checkout v2.0.0:**
    ```bash
-   git clone <REPOSITORY_URL>
+   git clone https://github.com/MarcCodinaLlonch/restaurant_backoffice.git
    cd restaurant_backoffice
+   git checkout v2.0.0
    ```
 
 2. **Create and activate a virtual environment:**
@@ -71,7 +72,12 @@ This version implements:
    pip install -r requirements.txt
    ```
 
-4. **Start the PostgreSQL database with Docker:**
+4. **Configure environment variables (optional, defaults provided):**
+   ```bash
+   cp .env.example .env
+   ```
+
+5. **Start the PostgreSQL database with Docker:**
    ```bash
    docker-compose up -d
    ```
