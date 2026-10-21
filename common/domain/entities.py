@@ -15,7 +15,9 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Optional, List, Dict, Any
 
-
+# Entitat de domini: Classe pura de python que representa concepte clau de negoci -> Categories
+# Completament independent de la base de dades
+# Fa que client i servidor parlin mateixes dades convertin dades JSON a Objectes Python
 @dataclass
 class CategoryEntity:
     """
@@ -28,6 +30,7 @@ class CategoryEntity:
 
     def to_dict(self) -> Dict[str, Any]:
         """Converteix l'entitat a un diccionari llest per ser serialitzat a JSON."""
+        # Quan fem un POST o PUT al servidor, hem d'enviar un diccionari que es convertirà a JSON.
         return {
             "id": self.id,
             "category_name": self.category_name,
@@ -37,6 +40,7 @@ class CategoryEntity:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "CategoryEntity":
         """Crea una instància de CategoryEntity a partir d'un diccionari (deserialització JSON)."""
+        # S'utilitza quan rebem JSON del servidor (resp.data), el passem a diccionari, i volem "reconstruir" objecte en Python.
         return cls(
             id=data.get("id"),
             category_name=data.get("category_name", ""),

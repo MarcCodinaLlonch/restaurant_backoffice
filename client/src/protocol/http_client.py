@@ -22,9 +22,9 @@ class ApiResponse:
     Encapsula el resultat d'una crida HTTP al servidor.
     Permet a la interfície d'usuari consultar fàcilment si l'operació ha tingut èxit.
     """
-    status_code: int
-    data: Any
-    error_message: Optional[str] = None
+    status_code: int # Codi d'estat HTTP (ex: 200, 404, 500)
+    data: Any # Dades rebudes del servidor
+    error_message: Optional[str] = None # Missatge d'error si la petició ha fallat
 
     @property
     def is_success(self) -> bool:
@@ -38,6 +38,7 @@ class HttpClient:
     """
 
     def __init__(self, host: str = "localhost", port: int = 8088, timeout: float = 10.0):
+        # Guardem la configuració bàsica de connexió
         self.host = host
         self.port = port
         self.timeout = timeout
@@ -46,18 +47,19 @@ class HttpClient:
         """
         Mètode intern que obre el socket TCP, envia la petició i rep la resposta.
         """
-        # Creem el socket TCP bloquejant
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(self.timeout)
+        
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # Creem el socket TCP bloquejant
+        sock.settimeout(self.timeout) # Evita que app quedi penjada esperant infinitament a un servidor que no respon
 
         try:
+            ## Anada de les dades:
             # 1. Connexió TCP amb el servidor
             sock.connect((self.host, self.port))
 
             # 2. Preparació del cos (si n'hi ha)
-            body_bytes = b""
+            body_bytes = b"" #Inicialitzem el cos buit en format binari (bytes)
             if body is not None:
-                body_bytes = json.dumps(body, ensure_ascii=False).encode("utf-8")
+                body_bytes = json.dumps(body, ensure_ascii=False).encode("utf-8") # Si body és Post o Put
 
             # 3. Construcció de la petició HTTP
             request_lines = [
@@ -77,13 +79,14 @@ class HttpClient:
             # 4. Enviament de bytes pel socket
             sock.sendall(full_request_bytes)
 
+            ## Tornada de dades:
             # 5. Recepció de la resposta (anem acumulant fins que el servidor tanca el socket)
-            response_buffer = bytearray()
-            while True:
-                chunk = sock.recv(2048)
-                if not chunk:
+            response_buffer = bytearray() # Creem contenidor
+            while True: # Mentres anem rebent dades...
+                chunk = sock.recv(2048) # Demanem fins a 2048 bytes de cop
+                if not chunk: # Si no s'han rebut dades -> break
                     break
-                response_buffer.extend(chunk)
+                response_buffer.extend(chunk) # Si s'han rebut dades s'afegeixen a les que hi havia al contenidor.
 
             # 6. Processament de la resposta HTTP
             if not response_buffer:
@@ -95,13 +98,14 @@ class HttpClient:
 
             # Separem capçaleres i cos
             split_idx = response_buffer.find(b"\r\n\r\n")
-            if split_idx != -1:
+            if split_idx != -1: # Si trobo separador -> trobo dades en la resposta
                 raw_headers = response_buffer[:split_idx].decode("utf-8", errors="replace")
                 raw_body = response_buffer[split_idx + 4:].decode("utf-8", errors="replace")
             else:
                 raw_headers = response_buffer.decode("utf-8", errors="replace")
                 raw_body = ""
 
+            # Extreiem codi resposta
             header_lines = raw_headers.split("\r\n")
             status_line = header_lines[0].split()
             status_code = int(status_line[1]) if len(status_line) > 1 else 500
@@ -122,7 +126,8 @@ class HttpClient:
                 else:
                     error_msg = f"Error HTTP {status_code}"
 
-            return ApiResponse(status_code=status_code, data=parsed_data, error_message=error_msg)
+            # Retorna tota la informació decodificada en objecte python
+            return ApiResponse(status_code=status_code, data=parsed_data, error_message=error_msg) 
 
         except ConnectionRefusedError:
             return ApiResponse(
@@ -143,8 +148,10 @@ class HttpClient:
                 error_message=f"Error de comunicació TCP: {str(e)}"
             )
         finally:
+            # Passi el que passi es tancarà el socket
             sock.close()
 
+    #El mètodes get/post/put/delete deleguen el treball pesat a _send_request
     def get(self, path: str) -> ApiResponse:
         """Envia una petició GET al servidor."""
         return self._send_request("GET", path)

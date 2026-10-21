@@ -1,5 +1,5 @@
 # seed.py: Utilitats d'inicialització i càrrega de dades d'exemple per a la base de dades.
-# Assegura que qualsevol persona (com el professor) que cloni el projecte tingui
+# Assegura que qualsevol persona que cloni el projecte tingui
 # una base de dades a punt sense haver d'executar migracions manuals.
 
 from urllib.parse import urlparse

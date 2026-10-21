@@ -44,19 +44,25 @@ def list_allergens(client: HttpClient, pause: bool = True):
     """Llista tots els al·lèrgens demanant-los al servidor."""
     console.print("\n[bold]--- Llistat d'Al·lèrgens ---[/bold]")
 
+    #Fem petició
     resp = client.get("/allergens")
+
+    # Comprovem si ha anat malament per mostrar error
     if not resp.is_success:
         console.print(f"[bold red]Error del servidor:[/bold red] {resp.error_message}")
         if pause:
             console.input("\nPrem Enter per continuar...")
         return
 
+    #Extreiem dades de Api response si ve buit hi posem llista buida per evitar errors
     raw_allergens = resp.data or []
+
+    # Convertim cada diccionari brut del JSON en un objecte de domini
     allergens = [AllergenEntity.from_dict(a) for a in raw_allergens]
 
-    if not allergens:
+    if not allergens: #Si llista esta buida avisem a usuari
         console.print("[yellow]No hi ha cap al·lèrgen a la base de dades.[/yellow]")
-    else:
+    else: # Si hi ha dades convertim a taula rich
         table = Table(show_header=True, header_style="bold yellow")
         table.add_column("ID", style="dim", width=5)
         table.add_column("Nom de l'Al·lèrgen")
