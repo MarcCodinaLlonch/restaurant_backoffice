@@ -85,3 +85,18 @@ class ResponseBuilder:
     def internal_error(message: str = "Error intern del servidor") -> bytes:
         """500 Internal Server Error: Excepció inesperada al servidor."""
         return ResponseBuilder.build(500, "Internal Server Error", {"error": message})
+
+    @staticmethod
+    def request_timeout(message: str = "Temps d'espera esgotat") -> bytes:
+        """408 Request Timeout: El client ha trigat massa a transmetre la petició."""
+        return ResponseBuilder.build(408, "Request Timeout", {"error": message})
+
+    @staticmethod
+    def payload_too_large(message: str = "Cos de la petició massa gran") -> bytes:
+        """413 Payload Too Large: El body de la petició supera el límit permès."""
+        return ResponseBuilder.build(413, "Payload Too Large", {"error": message})
+
+    @staticmethod
+    def service_unavailable(message: str = "Servei no disponible temporalment") -> bytes:
+        """503 Service Unavailable: El servidor ha assolit el límit màxim de connexions."""
+        return ResponseBuilder.build(503, "Service Unavailable", {"error": message})
