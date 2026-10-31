@@ -5,8 +5,13 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from src.domain.db import engine, Base #1. Afegit a script inicial
-from src.domain import models # Això "desperta" els models perquè Alembic els vegi
+from sqlalchemy import create_engine
+
+from server.src.persistence import models  # noqa: F401  "desperta" els models perquè Alembic els vegi
+from server.src.persistence.config import DB_URL
+from server.src.persistence.db import Base
+
+engine = create_engine(DB_URL)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

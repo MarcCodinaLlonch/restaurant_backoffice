@@ -1,53 +1,47 @@
 """
-bootstrap.py: Inicialització de la persistència, serveis i enrutador del servidor.
+bootstrap.py: Prepara la base de dades i munta les capes del servidor.
+
+CONCEPTE: separació de responsabilitats.
+Aquest fitxer només "connecta les peces" (persistència -> serveis -> router).
+No sap res de xarxa ni d'asyncio.
 """
+
 import logging
-from server.src.persistence.config import DB_URL
-from server.src.persistence.db import Base, engine, Session
+
+from server.src.persistence.db import Base
 from server.src.persistence.seed import ensure_database_exists, seed_initial_data
 from server.src.persistence.unit_of_work import UnitOfWorkFactory
+from server.src.protocol.router import Router
 from server.src.services import (
-    CategoryService,
     AllergenService,
+    CategoryService,
     DishService,
     EmployeeService,
     MenuService,
     SaleService,
 )
-from server.src.protocol.router import Router
 
 logger = logging.getLogger(__name__)
 
 
-def init_database(db_url: str = DB_URL) -> None:
-    """Assegura l'existència de la BD, crea les taules i carrega les dades inicials si cal."""
-    if not db_url:
-        raise RuntimeError("No s'ha definit cap URL de connexió a la base de dades.")
-
-    logger.info("Verificant connexió a la BD (%s)...", db_url.split('@')[-1] if '@' in db_url else db_url)
+def create_uow_factory(db_url: str) -> UnitOfWorkFactory:
+    """Crea la BD si cal, crea les taules, carrega dades de prova i retorna la factoria."""
     ensure_database_exists(db_url)
-
-    if engine:
-        Base.metadata.create_all(bind=engine)
-        seed_initial_data(Session)
-    logger.info("Base de dades llesta.")
-
-
-def create_router(db_url: str = DB_URL) -> Router:
-    """Instancia la factoria d'Unit of Work, els 6 serveis i configura el Router."""
     uow_factory = UnitOfWorkFactory(db_url)
-    category_svc = CategoryService(uow_factory)
-    allergen_svc = AllergenService(uow_factory)
-    dish_svc = DishService(uow_factory)
-    employee_svc = EmployeeService(uow_factory)
-    menu_svc = MenuService(uow_factory)
-    sale_svc = SaleService(uow_factory)
+    # Fem servir el MATEIX engine per a tot: un sol pool de connexions.
+    Base.metadata.create_all(bind=uow_factory.engine)
+    seed_initial_data(uow_factory.session_class)
+    logger.info("Database ready")
+    return uow_factory
 
+
+def create_router(uow_factory: UnitOfWorkFactory) -> Router:
+    """Crea els 6 serveis de negoci i el Router de la Pràctica 1 (reutilitzat sense canvis)."""
     return Router(
-        category_service=category_svc,
-        allergen_service=allergen_svc,
-        dish_service=dish_svc,
-        employee_service=employee_svc,
-        menu_service=menu_svc,
-        sale_service=sale_svc,
+        category_service=CategoryService(uow_factory),
+        allergen_service=AllergenService(uow_factory),
+        dish_service=DishService(uow_factory),
+        employee_service=EmployeeService(uow_factory),
+        menu_service=MenuService(uow_factory),
+        sale_service=SaleService(uow_factory),
     )

@@ -1,6 +1,6 @@
 # __init__.py a server/src/persistence
 from .config import DB_URL, SERVER_HOST, SERVER_PORT
-from .db import Base, engine, Session
+from .db import Base
 from .models import Employee, AppCredential, Category, Dish, Allergen, Menu, Sale
 from .repositories import (
     Repository,
@@ -18,8 +18,6 @@ __all__ = [
     "SERVER_HOST",
     "SERVER_PORT",
     "Base",
-    "engine",
-    "Session",
     "Employee",
     "AppCredential",
     "Category",
