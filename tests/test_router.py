@@ -2,6 +2,7 @@
 
 import json
 from unittest.mock import MagicMock
+
 import pytest
 
 from common.domain.entities import CategoryEntity
@@ -35,12 +36,7 @@ def test_router_get_categories(mock_router):
     router, cat_svc, _ = mock_router
     cat_svc.get_all.return_value = [CategoryEntity(id=1, category_name="Carns")]
 
-    req = HttpRequest(
-        method="GET",
-        path="/categories",
-        raw_path="/categories",
-        version="HTTP/1.1"
-    )
+    req = HttpRequest(method="GET", path="/categories", raw_path="/categories", version="HTTP/1.1")
 
     resp_bytes = router.handle_request(req)
     assert resp_bytes.startswith(b"HTTP/1.1 200 OK")
@@ -60,7 +56,7 @@ def test_router_post_categories(mock_router):
         path="/categories",
         raw_path="/categories",
         version="HTTP/1.1",
-        body={"category_name": "Peix"}
+        body={"category_name": "Peix"},
     )
 
     resp_bytes = router.handle_request(req)
@@ -78,7 +74,7 @@ def test_router_handles_value_error_as_bad_request(mock_router):
         path="/categories",
         raw_path="/categories",
         version="HTTP/1.1",
-        body={"category_name": ""}
+        body={"category_name": ""},
     )
 
     resp_bytes = router.handle_request(req)
@@ -91,10 +87,7 @@ def test_router_unknown_route_returns_404(mock_router):
     """Comprova que una ruta desconeguda retorna 404 Not Found."""
     router, _, _ = mock_router
     req = HttpRequest(
-        method="GET",
-        path="/ruta_inexistent",
-        raw_path="/ruta_inexistent",
-        version="HTTP/1.1"
+        method="GET", path="/ruta_inexistent", raw_path="/ruta_inexistent", version="HTTP/1.1"
     )
 
     resp_bytes = router.handle_request(req)

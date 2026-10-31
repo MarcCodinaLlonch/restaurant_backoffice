@@ -3,6 +3,7 @@ Experiment 02: Non-blocking (asyncio.sleep) vs Blocking Call (time.sleep)
 Demostra visualment amb un 'heartbeat' com una crida bloquejant tradicional
 atura completament l'Event Loop i impedeix l'execució de qualsevol altra tasca.
 """
+
 import asyncio
 import time
 

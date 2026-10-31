@@ -15,8 +15,9 @@ class ApiResponse:
     Encapsula el resultat d'una crida HTTP al servidor.
     Permet a la interfície d'usuari consultar fàcilment si l'operació ha tingut èxit.
     """
-    status_code: int                     # Codi d'estat HTTP (ex: 200, 404, 500)
-    data: Any                            # Dades rebudes del servidor
+
+    status_code: int  # Codi d'estat HTTP (ex: 200, 404, 500)
+    data: Any  # Dades rebudes del servidor
     error_message: Optional[str] = None  # Missatge d'error si la petició ha fallat
 
     @property
@@ -57,13 +58,13 @@ def decode_response(raw_bytes: bytes) -> ApiResponse:
         return ApiResponse(
             status_code=500,
             data=None,
-            error_message="El servidor ha tancat la connexió sense enviar resposta."
+            error_message="El servidor ha tancat la connexió sense enviar resposta.",
         )
 
     split_idx = raw_bytes.find(b"\r\n\r\n")
     if split_idx != -1:
         raw_headers = raw_bytes[:split_idx].decode("utf-8", errors="replace")
-        raw_body = raw_bytes[split_idx + 4:].decode("utf-8", errors="replace")
+        raw_body = raw_bytes[split_idx + 4 :].decode("utf-8", errors="replace")
     else:
         raw_headers = raw_bytes.decode("utf-8", errors="replace")
         raw_body = ""
@@ -124,19 +125,20 @@ class HttpClient:
             return ApiResponse(
                 status_code=503,
                 data=None,
-                error_message=f"No s'ha pogut connectar al servidor ({self.host}:{self.port}). Assegura't que està engegat."
+                error_message=(
+                    f"No s'ha pogut connectar al servidor ({self.host}:{self.port}). "
+                    "Assegura't que està engegat."
+                ),
             )
         except socket.timeout:
             return ApiResponse(
                 status_code=504,
                 data=None,
-                error_message="S'ha esgotat el temps d'espera (timeout) amb el servidor."
+                error_message="S'ha esgotat el temps d'espera (timeout) amb el servidor.",
             )
-        except Exception as e:
+        except Exception as error:
             return ApiResponse(
-                status_code=500,
-                data=None,
-                error_message=f"Error de comunicació TCP: {str(e)}"
+                status_code=500, data=None, error_message=f"Error de comunicació TCP: {str(error)}"
             )
         finally:
             sock.close()

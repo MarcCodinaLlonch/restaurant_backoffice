@@ -2,21 +2,22 @@
 # Gestiona la relació 1:N amb Category i N:M amb Allergen.
 
 from typing import List, Optional
+
 from common.domain.entities import DishEntity
-from server.src.persistence.unit_of_work import UnitOfWorkFactory
-from server.src.persistence.models import Dish
 from server.src.persistence.mappers import dish_to_entity
+from server.src.persistence.models import Dish
+from server.src.persistence.unit_of_work import UnitOfWorkFactory
 
 
 class DishService:
-    def __init__(self, uow_factory: UnitOfWorkFactory):
+    def __init__(self, uow_factory: UnitOfWorkFactory) -> None:
         self.uow_factory = uow_factory
 
     def get_all(self) -> List[DishEntity]:
         """Recupera tots els plats del restaurant."""
         with self.uow_factory.create() as uow:
             dishes = uow.dishes.get_all()
-            return [dish_to_entity(d) for d in dishes]
+            return [dish_to_entity(dish) for dish in dishes]
 
     def get_by_id(self, dish_id: int) -> Optional[DishEntity]:
         """Recupera un plat pel seu identificador."""
@@ -30,7 +31,7 @@ class DishService:
         """Recupera únicament els plats que estan en estat actiu."""
         with self.uow_factory.create() as uow:
             dishes = uow.dishes.get_active_dishes()
-            return [dish_to_entity(d) for d in dishes]
+            return [dish_to_entity(dish) for dish in dishes]
 
     def search_by_name(self, name: str) -> List[DishEntity]:
         """Cerca plats pel seu nom o part del nom."""
@@ -39,14 +40,14 @@ class DishService:
             return self.get_all()
         with self.uow_factory.create() as uow:
             dishes = uow.dishes.get_by_name(clean_name)
-            return [dish_to_entity(d) for d in dishes]
+            return [dish_to_entity(dish) for dish in dishes]
 
     def create(
         self,
         dish_name: str,
         id_category: int,
         description: Optional[str] = None,
-        is_active: bool = True
+        is_active: bool = True,
     ) -> DishEntity:
         """Crea un nou plat associat a una categoria existent (1:N)."""
         clean_name = (dish_name or "").strip()
@@ -55,18 +56,18 @@ class DishService:
 
         with self.uow_factory.create() as uow:
             # Validació de clau forana: la categoria ha d'existir
-            cat = uow.categories.get(id_category)
-            if not cat:
+            category = uow.categories.get(id_category)
+            if not category:
                 raise ValueError(f"No existeix cap categoria amb ID {id_category}.")
 
-            nou_plat = Dish(
+            new_dish = Dish(
                 dish_name=clean_name,
                 description=description.strip() if description and description.strip() else None,
                 id_category=id_category,
-                is_active=is_active
+                is_active=is_active,
             )
-            uow.dishes.add(nou_plat)
-            return dish_to_entity(nou_plat)
+            uow.dishes.add(new_dish)
+            return dish_to_entity(new_dish)
 
     def update(
         self,
@@ -74,7 +75,7 @@ class DishService:
         dish_name: Optional[str] = None,
         description: Optional[str] = None,
         is_active: Optional[bool] = None,
-        id_category: Optional[int] = None
+        id_category: Optional[int] = None,
     ) -> Optional[DishEntity]:
         """Actualitza les propietats d'un plat."""
         with self.uow_factory.create() as uow:
@@ -89,8 +90,8 @@ class DishService:
             if is_active is not None:
                 dish.is_active = is_active
             if id_category is not None:
-                cat = uow.categories.get(id_category)
-                if not cat:
+                category = uow.categories.get(id_category)
+                if not category:
                     raise ValueError(f"No existeix cap categoria amb ID {id_category}.")
                 dish.id_category = id_category
 

@@ -1,17 +1,18 @@
-# test_services.py: Proves unitàries de la capa de serveis utilitzant Mocks per aïllar la base de dades.
+# test_services.py: Proves unitàries de la capa de serveis.
+# Fem servir Mocks per aïllar la base de dades.
 
 import hashlib
 from datetime import date
 from unittest.mock import MagicMock
+
 import pytest
 
 from server.src.services.allergen_service import AllergenService
 from server.src.services.category_service import CategoryService
-from server.src.services.employee_service import EmployeeService
 from server.src.services.dish_service import DishService
+from server.src.services.employee_service import EmployeeService
 from server.src.services.menu_service import MenuService
 from server.src.services.sale_service import SaleService
-from server.src.persistence.models import Category, Employee, Dish, Menu, Sale
 
 
 @pytest.fixture
@@ -55,7 +56,7 @@ def test_employee_service_creates_credentials_with_sha256(mock_uow_factory):
         national_id="12345678A",
         role="Cambrer",
         email="marc@restaurant.com",
-        password="secretpassword"
+        password="secretpassword",
     )
 
     assert emp.name == "Marc"

@@ -1,7 +1,7 @@
 # test_response_builder.py: Proves unitàries per al ResponseBuilder.
 
 import json
-import pytest
+
 from common.domain.entities import CategoryEntity
 from server.src.protocol.response_builder import ResponseBuilder
 

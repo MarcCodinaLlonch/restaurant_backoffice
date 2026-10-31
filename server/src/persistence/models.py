@@ -2,11 +2,13 @@
 # Aquest fitxer només viu al costat del SERVIDOR. El client mai té accés a aquests models.
 # Cada classe representa una taula a la base de dades relacional.
 
-from .db import Base
-from sqlalchemy import Integer, String, Date, Boolean, Numeric, Table, Column, ForeignKey, DateTime
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import date, datetime
 from typing import Optional
+
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Table
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from .db import Base
 
 
 class Employee(Base):
@@ -24,21 +26,22 @@ class Employee(Base):
     # Relació 1:1 amb AppCredential.
     credentials: Mapped[Optional["AppCredential"]] = relationship(
         # uselist=False indica que és un sol objecte, no una llista.
-        # cascade="all, delete-orphan": Si eliminem l'empleat, elimina les seves credencials automàticament.
-        back_populates="employee", uselist=False, cascade="all, delete-orphan"
+        # cascade="all, delete-orphan": Si eliminem l'empleat,
+        # elimina les seves credencials automàticament.
+        back_populates="employee",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
     # Relació 1:N amb Sale: un empleat pot tenir moltes vendes.
     sales: Mapped[list["Sale"]] = relationship(
         # cascade="all, delete-orphan": Si eliminem empleat, eliminem les seves vendes.
-        back_populates="employee", cascade="all, delete-orphan"
+        back_populates="employee",
+        cascade="all, delete-orphan",
     )
 
     last_update: Mapped[Optional[datetime]] = mapped_column(
-        DateTime,
-        nullable=True,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        DateTime, nullable=True, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
     def __repr__(self):
@@ -54,7 +57,9 @@ class AppCredential(Base):
     # La PK és clau forana cap a Employee. Cada empleat té unes credencials -> 1:1
     id_employee: Mapped[int] = mapped_column(
         # ondelete="CASCADE": Si eliminem empleat a bd's, credencials s'eliminen també.
-        Integer, ForeignKey("employee.id", ondelete="CASCADE"), primary_key=True
+        Integer,
+        ForeignKey("employee.id", ondelete="CASCADE"),
+        primary_key=True,
     )
 
     # unique=True impedeix que dos empleats comparteixin el mateix email
@@ -65,10 +70,7 @@ class AppCredential(Base):
     employee: Mapped["Employee"] = relationship(back_populates="credentials")
 
     last_update: Mapped[Optional[datetime]] = mapped_column(
-        DateTime,
-        nullable=True,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        DateTime, nullable=True, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
     def __repr__(self):
@@ -87,14 +89,12 @@ class Category(Base):
     # 1:N amb Dish: una categoria pot tenir molts plats.
     dishes: Mapped[list["Dish"]] = relationship(
         # cascade="all, delete-orphan": Si eliminem categoria, eliminem els seus plats.
-        back_populates="category", cascade="all, delete-orphan"
+        back_populates="category",
+        cascade="all, delete-orphan",
     )
 
     last_update: Mapped[Optional[datetime]] = mapped_column(
-        DateTime,
-        nullable=True,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        DateTime, nullable=True, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
     def __repr__(self):
@@ -148,15 +148,10 @@ class Dish(Base):
     )
 
     # Relació N:M amb Menu a través de taula intermèdia menu_dish
-    menus: Mapped[list["Menu"]] = relationship(
-        secondary=menu_dish, back_populates="dishes"
-    )
+    menus: Mapped[list["Menu"]] = relationship(secondary=menu_dish, back_populates="dishes")
 
     last_update: Mapped[Optional[datetime]] = mapped_column(
-        DateTime,
-        nullable=True,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        DateTime, nullable=True, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
     def __repr__(self):
@@ -178,10 +173,7 @@ class Allergen(Base):
     )
 
     last_update: Mapped[Optional[datetime]] = mapped_column(
-        DateTime,
-        nullable=True,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        DateTime, nullable=True, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
     def __repr__(self):
@@ -201,20 +193,13 @@ class Menu(Base):
     price: Mapped[float] = mapped_column(Numeric(4, 2), nullable=False)
 
     # Relació N:M amb Dish a través de taula intermèdia menu_dish
-    dishes: Mapped[list["Dish"]] = relationship(
-        secondary=menu_dish, back_populates="menus"
-    )
+    dishes: Mapped[list["Dish"]] = relationship(secondary=menu_dish, back_populates="menus")
 
     # Relació 1:N amb Sale: un menú pot haver estat venut moltes vegades
-    sales: Mapped[list["Sale"]] = relationship(
-        back_populates="menu", cascade="all, delete-orphan"
-    )
+    sales: Mapped[list["Sale"]] = relationship(back_populates="menu", cascade="all, delete-orphan")
 
     last_update: Mapped[Optional[datetime]] = mapped_column(
-        DateTime,
-        nullable=True,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        DateTime, nullable=True, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
     def __repr__(self):
@@ -228,7 +213,8 @@ class Sale(Base):
     __tablename__ = "sale"
 
     # PK composta per tres camps: id_menu, id_employee i sale_date.
-    # La combinació dels tres ha de ser única: Mateix empleat no pot vendre mateix menú dues vegades el mateix dia.
+    # La combinació dels tres ha de ser única: el mateix empleat no pot vendre
+    # el mateix menú dues vegades el mateix dia.
     id_menu: Mapped[int] = mapped_column(ForeignKey("menu.id"), primary_key=True)
     id_employee: Mapped[int] = mapped_column(ForeignKey("employee.id"), primary_key=True)
     sale_date: Mapped[date] = mapped_column(Date, primary_key=True)
@@ -241,14 +227,14 @@ class Sale(Base):
     employee: Mapped["Employee"] = relationship(back_populates="sales")
 
     last_update: Mapped[Optional[datetime]] = mapped_column(
-        DateTime,
-        nullable=True,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        DateTime, nullable=True, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
     def __repr__(self):
         return f"Sale(menu={self.id_menu}, emp={self.id_employee}, date={self.sale_date})"
 
     def __str__(self):
-        return f"Venda del {self.sale_date}: Menú ID {self.id_menu} venut per Empleat ID {self.id_employee}"
+        return (
+            f"Venda del {self.sale_date}: Menú ID {self.id_menu} "
+            f"venut per Empleat ID {self.id_employee}"
+        )

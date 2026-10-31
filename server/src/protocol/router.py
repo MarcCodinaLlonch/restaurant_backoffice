@@ -95,9 +95,7 @@ class Router:
                 return self._handle_sales(method, parts, request)
 
             # Recurs no reconegut
-            return ResponseBuilder.not_found(
-                f"Recurs '{resource}' no trobat al servidor."
-            )
+            return ResponseBuilder.not_found(f"Recurs '{resource}' no trobat al servidor.")
 
         except ValueError as error:
             # Errors de validació de negoci controlats
@@ -231,12 +229,7 @@ class Router:
                 return self._no_content_or_not_found(done, "Plat no trobat.")
 
         # POST /dishes/{id}/allergens -> Afegir al·lèrgen a plat (relació N:M)
-        if (
-            len(parts) == 3
-            and parts[1].isdigit()
-            and parts[2] == "allergens"
-            and method == "POST"
-        ):
+        if len(parts) == 3 and parts[1].isdigit() and parts[2] == "allergens" and method == "POST":
             dish_id = int(parts[1])
             body = request.body or {}
             allergen_id = int(body.get("id_allergen", 0))
@@ -334,12 +327,7 @@ class Router:
                 return self._no_content_or_not_found(done, "Menú no trobat.")
 
         # POST /menus/{id}/dishes -> Afegir plat a menú (N:M)
-        if (
-            len(parts) == 3
-            and parts[1].isdigit()
-            and parts[2] == "dishes"
-            and method == "POST"
-        ):
+        if len(parts) == 3 and parts[1].isdigit() and parts[2] == "dishes" and method == "POST":
             menu_id = int(parts[1])
             body = request.body or {}
             dish_id = int(body.get("id_dish", 0))

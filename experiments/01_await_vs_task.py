@@ -3,6 +3,7 @@ Experiment 01: Sequential await vs Concurrent Tasks (asyncio.gather)
 Compara el temps d'execució entre cridar dues coroutines seqüencialment
 (esperant una darrere l'altra) vs programar-les concurrentment a l'Event Loop.
 """
+
 import asyncio
 import time
 

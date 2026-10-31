@@ -73,7 +73,7 @@ class ResponseBuilder:
 
     @staticmethod
     def bad_request(message: str) -> bytes:
-        """400 Bad Request: Dades invàlides enviades pel client (ex: nom buit, tipus incorrecte)."""
+        """400 Bad Request: Dades invàlides del client (ex: nom buit, tipus incorrecte)."""
         return ResponseBuilder.build(400, "Bad Request", {"error": message})
 
     @staticmethod

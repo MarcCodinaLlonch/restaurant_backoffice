@@ -1,6 +1,6 @@
 # __init__.py a client/src/ui
-from .category_ui import menu_categories
 from .allergen_ui import menu_allergens
+from .category_ui import menu_categories
 from .dish_ui import menu_dishes
 from .employee_ui import menu_employees
 from .menu_ui import menu_menus

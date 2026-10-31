@@ -3,19 +3,13 @@
 # El programa no parla directament amb SQL, fa servir repositoris per guardar (add),
 # recuperar (get), actualitzar (update) o esborrar (delete) objectes.
 
-from sqlalchemy.orm import Session
 from collections.abc import Iterable
-from .models import (
-    Employee,
-    Category,
-    Menu,
-    Dish,
-    Sale,
-    Allergen,
-    AppCredential
-)
-from typing import Generic, TypeVar, Optional, List
-from sqlalchemy import select, and_
+from typing import Generic, Optional, TypeVar
+
+from sqlalchemy import and_, select
+from sqlalchemy.orm import Session
+
+from .models import Allergen, Category, Dish, Employee, Menu, Sale
 
 # TypeVar permet definir tipus genèrics.
 K = TypeVar("K")  # K: Tipus de la clau primària (int, o tupla per a Sale)
@@ -56,9 +50,7 @@ class CategoryRepository(Repository[int, Category]):
         super().__init__(session, Category)
 
     def get_all(self) -> list[Category]:
-        return list(self.session.scalars(
-            select(Category).order_by(Category.id)
-        ).all())
+        return list(self.session.scalars(select(Category).order_by(Category.id)).all())
 
     def add(self, category: Category):
         if self.get_by_name(category.category_name):
@@ -82,9 +74,7 @@ class AllergenRepository(Repository[int, Allergen]):
         super().__init__(session, Allergen)
 
     def get_all(self) -> list[Allergen]:
-        return list(self.session.scalars(
-            select(Allergen).order_by(Allergen.id)
-        ).all())
+        return list(self.session.scalars(select(Allergen).order_by(Allergen.id)).all())
 
     def get_by_name(self, name: str) -> Optional[Allergen]:
         return self.session.scalars(
@@ -97,24 +87,28 @@ class DishRepository(Repository[int, Dish]):
         super().__init__(session, Dish)
 
     def get_all(self) -> list[Dish]:
-        return list(self.session.scalars(
-            select(Dish).order_by(Dish.id)
-        ).all())
+        return list(self.session.scalars(select(Dish).order_by(Dish.id)).all())
 
     def get_active_dishes(self) -> list[Dish]:
-        return list(self.session.scalars(
-            select(Dish).where(Dish.is_active == True).order_by(Dish.id)
-        ).all())
+        return list(
+            self.session.scalars(
+                select(Dish).where(Dish.is_active.is_(True)).order_by(Dish.id)
+            ).all()
+        )
 
     def get_by_category(self, category_id: int) -> list[Dish]:
-        return list(self.session.scalars(
-            select(Dish).where(Dish.id_category == category_id).order_by(Dish.id)
-        ).all())
+        return list(
+            self.session.scalars(
+                select(Dish).where(Dish.id_category == category_id).order_by(Dish.id)
+            ).all()
+        )
 
     def get_by_name(self, name: str) -> list[Dish]:
-        return list(self.session.scalars(
-            select(Dish).where(Dish.dish_name.ilike(f"%{name}%")).order_by(Dish.id)
-        ).all())
+        return list(
+            self.session.scalars(
+                select(Dish).where(Dish.dish_name.ilike(f"%{name}%")).order_by(Dish.id)
+            ).all()
+        )
 
     def add_allergen_to_dish(self, dish_id: int, allergen: Allergen) -> bool:
         dish = self.get(dish_id)
@@ -129,9 +123,7 @@ class EmployeeRepository(Repository[int, Employee]):
         super().__init__(session, Employee)
 
     def get_all(self) -> list[Employee]:
-        return list(self.session.scalars(
-            select(Employee).order_by(Employee.id)
-        ).all())
+        return list(self.session.scalars(select(Employee).order_by(Employee.id)).all())
 
     def add(self, employee: Employee):
         if self.national_id_exists(employee.national_id):
@@ -146,14 +138,18 @@ class EmployeeRepository(Repository[int, Employee]):
             conditions.append(Employee.surname.ilike(f"%{surname}%"))
         if not conditions:
             return self.get_all()
-        return list(self.session.scalars(
-            select(Employee).where(and_(*conditions)).order_by(Employee.id)
-        ).all())
+        return list(
+            self.session.scalars(
+                select(Employee).where(and_(*conditions)).order_by(Employee.id)
+            ).all()
+        )
 
     def get_by_role(self, role: str) -> list[Employee]:
-        return list(self.session.scalars(
-            select(Employee).where(Employee.role == role).order_by(Employee.id)
-        ).all())
+        return list(
+            self.session.scalars(
+                select(Employee).where(Employee.role == role).order_by(Employee.id)
+            ).all()
+        )
 
     def national_id_exists(self, national_id: str) -> bool:
         result = self.session.scalars(
@@ -162,7 +158,9 @@ class EmployeeRepository(Repository[int, Employee]):
         return result is not None
 
     def get_paginated(self, page: int, page_size: int) -> list[Employee]:
-        stmt = select(Employee).order_by(Employee.id).offset((page - 1) * page_size).limit(page_size)
+        stmt = (
+            select(Employee).order_by(Employee.id).offset((page - 1) * page_size).limit(page_size)
+        )
         return list(self.session.scalars(stmt).all())
 
 
@@ -171,22 +169,23 @@ class MenuRepository(Repository[int, Menu]):
         super().__init__(session, Menu)
 
     def get_all(self) -> list[Menu]:
-        return list(self.session.scalars(
-            select(Menu).order_by(Menu.id)
-        ).all())
+        return list(self.session.scalars(select(Menu).order_by(Menu.id)).all())
 
     def get_by_name(self, name: str) -> list[Menu]:
-        return list(self.session.scalars(
-            select(Menu).where(Menu.menu_name.ilike(f"%{name}%")).order_by(Menu.id)
-        ).all())
+        return list(
+            self.session.scalars(
+                select(Menu).where(Menu.menu_name.ilike(f"%{name}%")).order_by(Menu.id)
+            ).all()
+        )
 
     def get_by_price_range(self, min_price: float, max_price: float) -> list[Menu]:
-        return list(self.session.scalars(
-            select(Menu).where(
-                Menu.price >= min_price,
-                Menu.price <= max_price
-            ).order_by(Menu.id)
-        ).all())
+        return list(
+            self.session.scalars(
+                select(Menu)
+                .where(Menu.price >= min_price, Menu.price <= max_price)
+                .order_by(Menu.id)
+            ).all()
+        )
 
     def add_dish_to_menu(self, menu_id: int, dish: Dish) -> bool:
         menu = self.get(menu_id)
@@ -208,33 +207,31 @@ class SaleRepository(Repository[tuple, Sale]):
         super().__init__(session, Sale)
 
     def get_all(self) -> list[Sale]:
-        return list(self.session.scalars(
-            select(Sale).order_by(Sale.sale_date.desc())
-        ).all())
+        return list(self.session.scalars(select(Sale).order_by(Sale.sale_date.desc())).all())
 
     def get_paginated(self, page: int, page_size: int) -> list[Sale]:
-        stmt = select(Sale).order_by(Sale.sale_date.desc()).offset((page - 1) * page_size).limit(page_size)
+        stmt = (
+            select(Sale)
+            .order_by(Sale.sale_date.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
         return list(self.session.scalars(stmt).all())
 
     def get_sales_by_date(self, target_date) -> list[Sale]:
-        return list(self.session.scalars(
-            select(Sale).where(Sale.sale_date == target_date)
-        ).all())
+        return list(self.session.scalars(select(Sale).where(Sale.sale_date == target_date)).all())
 
     def get_sales_by_employee(self, employee_id: int) -> list[Sale]:
-        return list(self.session.scalars(
-            select(Sale).where(Sale.id_employee == employee_id)
-        ).all())
+        return list(
+            self.session.scalars(select(Sale).where(Sale.id_employee == employee_id)).all()
+        )
 
     def get_sales_by_menu(self, menu_id: int) -> list[Sale]:
-        return list(self.session.scalars(
-            select(Sale).where(Sale.id_menu == menu_id)
-        ).all())
+        return list(self.session.scalars(select(Sale).where(Sale.id_menu == menu_id)).all())
 
     def get_sales_by_date_range(self, date_from, date_to) -> list[Sale]:
-        return list(self.session.scalars(
-            select(Sale).where(
-                Sale.sale_date >= date_from,
-                Sale.sale_date <= date_to
-            )
-        ).all())
+        return list(
+            self.session.scalars(
+                select(Sale).where(Sale.sale_date >= date_from, Sale.sale_date <= date_to)
+            ).all()
+        )
