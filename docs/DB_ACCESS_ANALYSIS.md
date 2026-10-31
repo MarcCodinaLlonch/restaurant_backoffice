@@ -82,7 +82,9 @@ SQLAlchemy 2.0 té una API asíncrona: `create_async_engine` + `AsyncSession`, a
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-engine = create_async_engine("postgresql+asyncpg://postgres:secret@localhost:5433/restaurant_db_dev")
+engine = create_async_engine(
+    "postgresql+asyncpg://postgres:secret@localhost:5433/restaurant_db_dev"
+)
 session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
 async with session_factory() as session:
