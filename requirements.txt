@@ -41,4 +41,5 @@ tornado==6.5.5
 traitlets==5.14.3
 typing_extensions==4.15.0
 wcwidth==0.6.0
-pytest-asyncio
+pytest-asyncio==1.4.1
+ruff==0.17.3
