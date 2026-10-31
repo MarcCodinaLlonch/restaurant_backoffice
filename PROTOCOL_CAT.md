@@ -10,15 +10,45 @@ Aquest document descriu l'especificació completa del protocol d'aplicació util
 
 ## 1. Visió General i Fonaments Teòrics
 
-El protocol està inspirat en **HTTP/1.1 REST** implementat directament sobre la capa de transport **TCP (Transmission Control Protocol)** mitjançant un servidor asíncron concurrent amb **AsyncIO** en Python.
+> **El format dels missatges (*wire format*) no ha canviat respecte de la v2.0.0; només ha canviat la implementació del transport al servidor (asyncio).**
+> Qualsevol client de la v2.0.0 (inclòs l'`HttpClient` bloquejant original) funciona amb el servidor v3.0.0 sense cap canvi.
 
-### Concurrència Asíncrona i Transport (Novetat v3.0.0):
-1. **Model no bloquejant**: El servidor atén múltiples clients simultanis sobre un sol fil de CPU utilitzant l'Event Loop de Python i `asyncio.start_server`.
-2. **Una Task per client**: Cada connexió és aïllada; un client lent o inactiu mai no bloqueja les peticions dels altres.
-3. **Framing TCP segur**:
-   - `readuntil(b"\r\n\r\n")` per a la lectura asíncrona de capçaleres.
-   - `readexactly(content_length)` per a la lectura exacta del cos segons la capçalera `Content-Length`.
-4. **Model Stateless (Sense estat)**: Cada petició és atòmica i independent (`Connection: close`).
+El protocol està inspirat en **HTTP/1.1 REST** implementat directament sobre la capa de transport **TCP (Transmission Control Protocol)**.
+
+### Per què no utilitzar Pickle de Python?
+Pickle permet serialitzar objectes natius de Python fàcilment, però presenta greus problemes de seguretat (execució remota de codi maliciós en deserialitzar dades no confiables) i genera un acoblament estricte entre les versions i llenguatges del client i del servidor.
+
+### Solució adoptada:
+1. **Format de text amb codificació UTF-8**: Missatges llegibles per humans i interoperables amb qualsevol tecnologia o llenguatge futur.
+2. **Serialització de dades en JSON**: Totes les càrregues útils (payloads) viatgen en format JSON estàndard.
+3. **Delimitació de missatges**:
+   - Cada línia de capçalera finalitza amb la seqüència estàndard CRLF (`\r\n`).
+   - El final de les capçaleres es determina amb una línia buida (`\r\n\r\n`).
+   - Si la petició o la resposta conté un cos (body), la capçalera `Content-Length` indica exactament quants bytes s'han de llegir del socket.
+4. **Model Stateless (Sense estat)**: Cada petició és atòmica i independent. El client obre una connexió TCP, envia la petició, rep la resposta i es tanca la connexió (`Connection: close`).
+
+### 1.1 Transport i concurrència (v3.0.0)
+- El servidor fa servir `asyncio.start_server`: **una Task per connexió**, totes en un sol fil (l'event loop). Un client lent o inactiu no bloqueja mai els altres.
+- **Una petició per connexió:** el servidor llegeix una petició, envia una resposta i tanca el socket.
+- *Framing* al servidor: `reader.readuntil(b"\r\n\r\n")` per a les capçaleres i `reader.readexactly(content_length)` per al cos.
+- L'accés a la BD (SQLAlchemy + psycopg2, bloquejants) s'executa en fils amb `asyncio.to_thread`, limitat per un `asyncio.Semaphore`, de manera que l'event loop no es queda mai aturat.
+
+### 1.2 Límits i timeouts
+
+| Paràmetre (`.env`) | Per defecte | Què passa si se supera |
+| :--- | :--- | :--- |
+| `READ_TIMEOUT_SECONDS` | 5 s | **408** Request Timeout |
+| `MAX_BODY_SIZE` | 1 MB | **413** Payload Too Large |
+| `MAX_CONNECTIONS` | 50 | **503** Service Unavailable |
+| `DB_MAX_CONCURRENCY` | 5 (= `pool_size` de SQLAlchemy) | La petició espera torn al semàfor (sense bloquejar l'event loop) |
+
+### 1.3 Cicle de vida d'una connexió
+1. El client obre una connexió TCP; `asyncio.start_server` crea una Task nova que executa `handle_client`.
+2. Si hi ha massa connexions actives, el servidor respon **503** de seguida.
+3. El servidor llegeix la petició amb un timeout (**408** si no arriba a temps, **413** si el cos és massa gran, **400** si està mal formada).
+4. La petició s'envia al Router en un fil secundari.
+5. S'escriu la resposta (`write` + `await drain()`).
+6. El socket es tanca **sempre** (`finally: close()` + `await wait_closed()`), fins i tot si hi ha hagut errors. Un error inesperat només afecta la Task d'aquell client.
 
 ---
 
@@ -70,10 +100,10 @@ Content-Length: 38\r\n
 | **204** | No Content | Operació realitzada amb èxit (ex: DELETE). No retorna cos. |
 | **400** | Bad Request | Dades invàlides enviades pel client (nom buit, preu negatiu, format incorrecte). |
 | **404** | Not Found | El recurs sol·licitat no existeix a la base de dades o la ruta és desconeguda. |
-| **408** | Request Timeout | El client ha trigat més de `READ_TIMEOUT_SECONDS` (5s) a transmetre la petició. |
-| **413** | Payload Too Large | El cos de la petició supera el límit configurat `MAX_BODY_SIZE` (1 MB). |
+| **408** | Request Timeout | El genera el servidor: el client no ha enviat la petició completa en `READ_TIMEOUT_SECONDS` (5 s). |
+| **413** | Payload Too Large | El genera el servidor: el `Content-Length` supera `MAX_BODY_SIZE` (1 MB). |
 | **500** | Internal Server Error | Error inesperat durant l'execució al servidor. |
-| **503** | Service Unavailable | Servidor saturat (`MAX_CONNECTIONS` assolit) o no accessible. |
+| **503** | Service Unavailable | El genera el servidor quan s'arriba a `MAX_CONNECTIONS`. També el genera **el client** quan no pot connectar amb el servidor. |
 
 En cas d'error (4xx o 5xx), el cos de la resposta sempre conté un objecte JSON amb la clau `"error"`:
 ```json

@@ -1,10 +1,11 @@
-# 🍽️ Restaurant BackOffice — v2.0 (Client/Server Architecture)
+# 🍽️ Restaurant BackOffice — v3.0 (AsyncIO Multi-Client Server)
 
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![SQLAlchemy](https://img.shields.io/badge/ORM-SQLAlchemy-red.svg)](https://www.sqlalchemy.org/)
-[![Sockets](https://img.shields.io/badge/Network-TCP%20Sockets-orange.svg)](https://docs.python.org/3/library/socket.html)
+[![asyncio](https://img.shields.io/badge/Network-asyncio-orange.svg)](https://docs.python.org/3/library/asyncio.html)
 [![Rich](https://img.shields.io/badge/CLI-Rich-blueviolet.svg)](https://rich.readthedocs.io/)
-[![Tests](https://img.shields.io/badge/Tests-Pytest%20Passing-brightgreen.svg)](https://docs.pytest.org/)
+[![Tests](https://img.shields.io/badge/Tests-47%20passing-brightgreen.svg)](https://docs.pytest.org/)
+[![Ruff](https://img.shields.io/badge/PEP%208-ruff-black.svg)](https://docs.astral.sh/ruff/)
 
 > 🌐 **Language:** **English (README.md)** | [Català (README_CAT.md)](README_CAT.md)
 
@@ -12,15 +13,14 @@
 
 ## 📖 Project Description
 
-**Restaurant BackOffice v2.0** is a comprehensive internal management application for restaurants refactored into a **Client/Server Architecture using blocking TCP sockets**.
+**Restaurant BackOffice v3.0** is an internal management application for restaurants with a **Client/Server architecture**. In this version (Practice 2) the server has been refactored from blocking sockets to **`asyncio`**, so it serves **many clients concurrently**.
 
 This version implements:
-- **Separation of Concerns:** The Server is the sole component accessing the database (PostgreSQL) through SQLAlchemy. The Client is completely independent and has zero ORM dependencies.
-- **REST-Inspired Communication Protocol:** Plain text request and response formatting based on the HTTP/1.1 standard, exchanging payloads serialized as **JSON** encoded in **UTF-8**.
-- **Clean Domain Layer:** Pure business entities (`@dataclass`) in `common/` decoupled from persistence technologies.
-- **Service Layer & Router:** Request routing, parameter extraction, and business logic validation on the server.
-- **Unit of Work & Repositories:** Atomic transaction management and isolated SQL queries.
-- **Automated Test Suite:** 100% test coverage for the service layer, request validation, routing, protocol serialization/deserialization, and real socket communication.
+- **Asynchronous multi-client server:** `asyncio.start_server` creates **one Task per client**, all running on a single thread (the event loop). An idle or slow client never blocks the others.
+- **Blocking database kept off the event loop:** SQLAlchemy + psycopg2 run in worker threads (`asyncio.to_thread`), limited by an `asyncio.Semaphore`.
+- **Robustness:** read timeout (408), maximum body size (413), maximum connections (503), clean handling of abrupt disconnections and graceful shutdown with Ctrl+C.
+- **Unchanged protocol and business layer:** the REST-inspired HTTP/1.1 + JSON protocol, the services, the Router and the persistence layer from Practice 1 are reused as they were.
+- **Automated tests:** services, router, protocol serialization/deserialization and real multi-client scenarios over TCP.
 
 ---
 
@@ -39,6 +39,9 @@ This version implements:
 | **Communication Protocol** | [PROTOCOL_ENG.md](PROTOCOL_ENG.md) | [PROTOCOL_CAT.md](PROTOCOL_CAT.md) |
 | **Project & Study Guide** | [PROJECT_DOCUMENTATION_ENG.md](PROJECT_DOCUMENTATION_ENG.md) | [PROJECT_DOCUMENTATION_CAT.md](PROJECT_DOCUMENTATION_CAT.md) |
 | **Execution & Testing Guide** | [EXECUTION_GUIDE_ENG.md](EXECUTION_GUIDE_ENG.md) | [EXECUTION_GUIDE_CAT.md](EXECUTION_GUIDE_CAT.md) |
+| **Asynchronous Architecture (diagrams)** | — | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| **Blocking DB vs event loop analysis** | — | [docs/DB_ACCESS_ANALYSIS.md](docs/DB_ACCESS_ANALYSIS.md) |
+| **Multi-client demonstration** | — | [docs/DEMO.md](docs/DEMO.md) |
 
 ---
 
@@ -47,24 +50,25 @@ This version implements:
 | Requirement | Detail |
 |---|---|
 | Operating System | Linux, Windows, or macOS |
-| Python Runtime | 3.10 or higher (tested with 3.14) |
+| Python Runtime | **3.11 or higher** (uses `asyncio.timeout`; tested with 3.14) |
 | Database Engine | PostgreSQL (managed with Docker Compose) |
 
 ---
 
 ## 🚀 Installation & Setup
 
-1. **Clone the repository and checkout v2.0.0:**
+1. **Clone the repository and checkout v3.0.0:**
    ```bash
    git clone https://github.com/MarcCodinaLlonch/restaurant_backoffice.git
    cd restaurant_backoffice
-   git checkout v2.0.0
+   git checkout v3.0.0
    ```
 
 2. **Create and activate a virtual environment:**
    ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
+   python -m venv .venv
+   .venv\Scripts\activate          # Windows
+   source .venv/bin/activate       # Linux / macOS
    ```
 
 3. **Install project dependencies:**
@@ -74,49 +78,62 @@ This version implements:
 
 4. **Configure environment variables (optional, defaults provided):**
    ```bash
-   cp .env.example .env
+   copy .env.example .env          # Windows
+   cp .env.example .env            # Linux / macOS
    ```
 
 5. **Start the PostgreSQL database with Docker:**
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
 ---
 
 ## 💻 Running the Application
 
-### 1. Start the TCP Server
-In your first terminal:
+### 1. Start the asyncio server
 ```bash
 python server/server.py
 ```
-The server will start listening for TCP connections on `0.0.0.0:8088`.
+The server listens on `0.0.0.0:8088`. Stop it with **Ctrl+C**: it closes cleanly and prints `Server stopped, resources released`.
 
-### 2. Start the Interactive Client
-In a second terminal:
+### 2. Start the interactive client (one or more terminals)
 ```bash
 python client/client.py
 ```
-This launches the rich command-line user interface supporting all business operations:
-- Employee Management (including 1:1 credentials with SHA-256 password hashing)
-- Category Management
-- Dish Management (with associated allergens)
-- Allergen Management
-- Menu Management (with associated dishes)
-- Sales Management (with composite primary keys)
+Open it in several terminals at the same time: every client is served concurrently. The menu covers employees (with 1:1 credentials), categories, dishes (with allergens), allergens, menus (with dishes) and sales (composite primary key).
+
+### 3. Automated client launcher (load test)
+```bash
+python client/load_test_client.py --clients 20                    # 20 clients at the same time (gather)
+python client/load_test_client.py --clients 20 --sequential       # one after another (to compare)
+python client/load_test_client.py --clients 20 --idle-clients 3   # plus 3 idle clients that send nothing
+```
+
+### 4. Experiments (asyncio fundamentals)
+```bash
+python experiments/01_await_vs_task.py          # two awaits in a row are NOT concurrent; gather is
+python experiments/02_blocking_call.py          # a blocking call freezes the event loop
+python experiments/03_blocking_vs_offloaded.py  # blocking DB inline vs to_thread (no PostgreSQL needed)
+```
 
 ---
 
 ## 🧪 Running Automated Tests
 
-To execute the full suite of unit and integration tests over TCP:
 ```bash
 pytest -v
 ```
-All 21 tests will pass, validating:
-- HTTP request parsing and stream framing
-- Response building and JSON serialization
-- URL routing and error handling (400, 404, 500)
-- Business logic in the service layer using Mocks
-- End-to-end TCP client/server socket communication
+All **47 tests** pass (they do not need PostgreSQL):
+
+| Area | Test files |
+|---|---|
+| Services | `test_services.py` |
+| Router | `test_router.py` |
+| Protocol serialization / deserialization | `test_request_parser.py`, `test_response_builder.py`, `test_async_request_reader.py` |
+| Multi-client and robustness | `test_async_server.py` (20 concurrent clients, idle client, slow DB, disconnection, unexpected error, 408, 400, 413, 503, Practice 1 client) |
+
+PEP 8 check:
+```bash
+ruff check .
+```

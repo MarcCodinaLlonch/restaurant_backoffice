@@ -1,7 +1,8 @@
-# Guia Pas a Pas: Com Executar i Provar Restaurant BackOffice v2.0
+# Guia Pas a Pas: Com Executar i Provar Restaurant BackOffice v3.0
 
 > 🌐 **Idioma:** [English (EXECUTION_GUIDE_ENG.md)](EXECUTION_GUIDE_ENG.md) | **Català (EXECUTION_GUIDE_CAT.md)**  
-> Tutorial complet per provar l'aplicació Client/Servidor, els tests automatitzats i comprovar el funcionament de totes les opcions.
+> Tutorial complet per provar l'aplicació Client/Servidor, els tests automatitzats i comprovar el funcionament de totes les opcions.  
+> Arquitectura del servidor asyncio (v3.0): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
@@ -18,7 +19,8 @@ cd restaurant_backoffice
 
 1. **Activa l'entorn virtual de Python:**
    ```bash
-   source .venv/bin/activate
+   .venv\Scripts\activate          # Windows
+   source .venv/bin/activate       # Linux / macOS
    ```
 
 2. **Comprova que el contenidor Docker de PostgreSQL està en marxa:**
@@ -39,34 +41,30 @@ pytest -v
 ```
 
 **Què veuràs:**
-Un llistat verd amb **21 tests superats (100% PASSED)** en menys d'un segon:
-- Prova de socket TCP real Client-Servidor.
+Un llistat verd amb **47 tests superats (100% PASSED)** en un segon aproximadament:
+- Escenaris multiclient reals contra el servidor asyncio (20 clients alhora, client inactiu, BD lenta, 408/400/413/503).
 - Parsing i construcció de peticions/respostes HTTP.
 - Lògica de negoci de tots els serveis amb Mocks.
 - Control d'errors i rutes 404 del Router.
 
 ---
 
-## PAS 3: Arrencar el Servidor TCP (Terminal 1)
+## PAS 3: Arrencar el Servidor asyncio (Terminal 1)
 
 Obre la **primera terminal** (pots anomenar-la "Terminal Servidor"):
 
 ```bash
-source .venv/bin/activate
+.venv\Scripts\activate          # Windows
+source .venv/bin/activate       # Linux / macOS
 python server/server.py
 ```
 
 **Sortida esperada per pantalla:**
 ```text
-[*] Inicialitzant serveis i connexió a la BD (localhost:5433/restaurant_db_dev)...
-============================================================
- RESTAURANT BACKOFFICE — SERVIDOR TCP EN EXECUCIÓ
- Escoltant a: http://0.0.0.0:8088/
- Protocol: HTTP/1.1 REST sobre TCP (Sockets bloquejants)
- Prem Ctrl+C per aturar el servidor.
-============================================================
+HH:MM:SS [INFO] server.src.bootstrap: Database ready
+HH:MM:SS [INFO] server: Listening on 0.0.0.0:8088 (Ctrl+C to stop)
 ```
-> ⏸️ **Deixa aquesta terminal oberta.** El servidor està esperant connexions.
+> ⏸️ **Deixa aquesta terminal oberta.** El servidor està esperant connexions i n'atén moltes alhora (una Task d'asyncio per client).
 
 ---
 
@@ -75,7 +73,8 @@ python server/server.py
 Obre una **segona terminal** (al VS Code pots prémer la icona de dividir terminal `Split Terminal` o `Ctrl + Shift + 5`):
 
 ```bash
-source .venv/bin/activate
+.venv\Scripts\activate          # Windows
+source .venv/bin/activate       # Linux / macOS
 python client/client.py
 ```
 
@@ -174,8 +173,7 @@ Content-Length: 182
 ## PAS 7: Com Aturar el Sistema
 
 1. **A la Terminal del Client:** Prem `0` al menú principal. Sortirà dient `Fins aviat!`.
-2. **A la Terminal del Servidor:** Prem `Ctrl + C`. El servidor mostrarà:
+2. **A la Terminal del Servidor:** Prem `Ctrl + C`. El servidor s'atura de manera neta (sense *traceback*) i mostrarà:
    ```text
-   [*] Aturant el servidor per petició de l'usuari...
-   [*] Servidor aturat correctament.
+   HH:MM:SS [INFO] server: Server stopped, resources released
    ```

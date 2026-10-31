@@ -1,8 +1,9 @@
-# Architecture, Design & Study Documentation — Restaurant BackOffice v2.0
+# Architecture, Design & Study Documentation — Restaurant BackOffice v3.0
 
 > 🌐 **Language:** **English (PROJECT_DOCUMENTATION_ENG.md)** | [Català (PROJECT_DOCUMENTATION_CAT.md)](PROJECT_DOCUMENTATION_CAT.md)  
 > **Comprehensive Guide for Vocational Software Development Students (DAM - 2nd Year)**  
-> Associated Course Modules: M0486 (Data Access), M0487 (Network Services and Processes) & M0488 (Enterprise Management Systems).
+> Associated Course Modules: M0486 (Data Access), M0487 (Network Services and Processes) & M0488 (Enterprise Management Systems).  
+> **v3.0 (Practice 2):** the server is now asynchronous (`asyncio.start_server`, one Task per client). The protocol and the business layer described here are unchanged. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
@@ -105,11 +106,15 @@ restaurant_backoffice/
 │       └── entities.py              # Pure dataclasses (CategoryEntity, DishEntity, etc.)
 │
 ├── server/                          # SERVER SUBSYSTEM
-│   ├── server.py                    # Main blocking TCP socket listener loop
+│   ├── server.py                    # Entry point: asyncio.start_server + serve_forever
 │   └── src/
+│       ├── bootstrap.py             # Wires persistence -> services -> router
+│       ├── network/                 # ASYNCIO NETWORK LAYER (v3.0)
+│       │   ├── connection_handler.py # One Task per client: read -> process -> respond -> close
+│       │   └── request_dispatcher.py # Runs the Router in a thread (to_thread + Semaphore)
 │       ├── persistence/             # PERSISTENCE LAYER (SERVER ONLY)
 │       │   ├── config.py            # Database and network configuration
-│       │   ├── db.py                # SQLAlchemy Engine and Base
+│       │   ├── db.py                # SQLAlchemy declarative Base (the engine lives in UnitOfWorkFactory)
 │       │   ├── models.py            # ORM Models (Employee, Dish, Sale...)
 │       │   ├── repositories.py      # SQL query abstraction
 │       │   ├── unit_of_work.py      # Transaction manager (UoW)
@@ -122,12 +127,14 @@ restaurant_backoffice/
 │       │   ├── menu_service.py
 │       │   └── sale_service.py
 │       └── protocol/                # PROTOCOL OVER TCP
-│           ├── request_parser.py    # Decodes raw TCP stream into HttpRequest
+│           ├── async_request_reader.py # Reads one request from an asyncio StreamReader
+│           ├── request_parser.py    # Pure functions: bytes -> HttpRequest
 │           ├── response_builder.py  # Builds valid HTTP byte responses
 │           └── router.py            # Dispatches requests to service layer
 │
 ├── client/                          # CLIENT SUBSYSTEM
 │   ├── client.py                    # Terminal client entry point
+│   ├── load_test_client.py          # Automated client launcher (concurrent / sequential)
 │   └── src/
 │       ├── protocol/
 │       │   └── http_client.py       # Custom TCP socket HTTP client
@@ -144,7 +151,8 @@ restaurant_backoffice/
 │   ├── test_response_builder.py     # HTTP response builder tests
 │   ├── test_services.py             # Service logic tests with Mocks
 │   ├── test_router.py               # Request router tests
-│   └── test_client_server_integration.py # Real TCP client/server integration test
+│   ├── test_async_request_reader.py # Async request reading tests
+│   └── test_async_server.py         # Real multi-client tests against the asyncio server
 │
 ├── PROTOCOL_ENG.md                  # Protocol Specification (English)
 ├── PROTOCOL_CAT.md                  # Protocol Specification (Catalan)
@@ -250,7 +258,7 @@ docker-compose up -d
 pytest -v
 ```
 
-### Step 4: Start TCP Server
+### Step 4: Start the asyncio Server
 In terminal 1:
 ```bash
 python server/server.py

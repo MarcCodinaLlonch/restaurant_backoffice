@@ -1,135 +1,148 @@
-# Arquitectura del Servidor Asíncron (AsyncIO) — Versió 3.0.0
+# Arquitectura del servidor asíncron (asyncio): Restaurant BackOffice v3.0
 
-Aquest document detalla l'arquitectura del sistema Restaurant BackOffice refactoritzat a un model asíncron concurrent no bloquejant basat en la llibreria estàndard `asyncio` de Python.
+## 1. Resum
 
----
+- **Pràctica 1:** servidor TCP amb sockets bloquejants. Atenia **un client alhora**: mentre esperava un `recv()`, la resta de clients feien cua.
+- **Pràctica 2:** servidor amb `asyncio.start_server`. Cada client té **la seva Task** i totes comparteixen **un sol fil** (l'event loop). Quan una Task fa `await`, cedeix el torn a les altres.
+- La base de dades (SQLAlchemy + psycopg2) és **bloquejant**, així que s'executa **en fils** (`asyncio.to_thread`) limitats per un `asyncio.Semaphore`. Així l'event loop no es queda mai aturat.
+- Les capes de protocol, negoci i persistència de la P1 es reutilitzen **sense canvis**.
 
-## 1. Visió General i Comparativa (P1 vs P2)
+## 2. Diagrama de capes
 
-### Pràctica 1 (Model Seqüencial Bloquejant):
-- Socket TCP tradicional bloquejant amb `listen(1)` i bucle `accept()` seqüencial.
-- Si un client trigava a enviar dades o quedava inactiu, el servidor es congelava a `recv()` i impedia l'entrada de qualsevol altre client.
-
-### Pràctica 2 (Model Asíncron Basat en Tasques i Event Loop):
-- Un únic procés i un únic fil principal que executa l'**Event Loop** d'AsyncIO.
-- Ús de `asyncio.start_server`: cada client connectat genera automàticament una **Task** independent i concurrent.
-- Entrada/Sortida no bloquejant mitjançant `asyncio.StreamReader` i `asyncio.StreamWriter`.
-- Desacoblament de l'accés síncron a la Base de Dades mitjançant `RequestDispatcher` (`asyncio.to_thread` + `asyncio.Semaphore`).
-
----
-
-## 2. Diagrama de Components per Capes
+![Diagrama de capes](img/architecture.png)
 
 ```mermaid
-graph TD
-    subgraph Clients
-        C1["Client 1 (Interactiu Rich)"]
-        C2["Client 2 (Interactiu Rich)"]
-        CN["Client N (Load Test Client)"]
+flowchart TD
+    subgraph CLIENTS["Clients (N alhora)"]
+        C1["client.py (menú interactiu)"]
+        C2["load_test_client.py (N clients amb gather)"]
     end
 
-    subgraph Capa de Xarxa (AsyncIO)
-        ATS["AsyncTcpServer (start_server)"]
-        CCH["ClientConnectionHandler (1 Task / Client)"]
+    subgraph NET["Capa de xarxa - asyncio (NOU a la P2)"]
+        SS["asyncio.start_server (server.py)"]
+        CH["ClientConnectionHandler.handle_client (1 Task per client)"]
+        RR["read_request (StreamReader)"]
         RD["RequestDispatcher (to_thread + Semaphore)"]
     end
 
-    subgraph Capa de Protocol
-        AR["read_request (StreamReader)"]
-        RP["RequestParser (Pura)"]
-        RB["ResponseBuilder (HTTP/1.1)"]
-        RT["Router (Encaminament)"]
+    subgraph PROTO["Capa de protocol (P1)"]
+        RP["RequestParser"]
+        RT["Router"]
+        RB["ResponseBuilder"]
     end
 
-    subgraph Capa de Negoci
-        S_CAT["CategoryService"]
-        S_DISH["DishService"]
-        S_EMP["EmployeeService"]
-        S_MENU["MenuService"]
-        S_SALE["SaleService"]
+    subgraph BUS["Capa de negoci (P1)"]
+        SV["Services (Category, Dish, Menu...)"]
     end
 
-    subgraph Capa de Persistència
-        UOW["UnitOfWorkFactory / SqlAlchemyUnitOfWork"]
-        REPOS["Repositories (Category, Dish, Employee, ...)"]
-        PG[("PostgreSQL / SQLite")]
+    subgraph PERS["Capa de persistència (P1)"]
+        UOW["UnitOfWork + Repositories"]
+        DB[("PostgreSQL")]
     end
 
-    C1 & C2 & CN -->|TCP Streams| ATS
-    ATS -->|Assigna StreamReader / StreamWriter| CCH
-    CCH -->|Llegeix de forma asíncrona| AR
-    AR -->|Interpreta capçaleres i body| RP
-    CCH -->|Delega petició HttpRequest| RD
-    RD -->|Offload fora de l'Event Loop| RT
-    RT -->|Invoca lògica de negoci| S_CAT & S_DISH & S_EMP & S_MENU & S_SALE
-    S_CAT & S_DISH & S_EMP & S_MENU & S_SALE -->|Transaccions atòmiques| UOW
-    UOW --> REPOS
-    REPOS -->|Queries SQL síncrones| PG
-    RT -->|Genera bytes HTTP| RB
-    CCH -->|Escriu bytes i drain| C1 & C2 & CN
+    C1 -- "TCP: HTTP/1.1 + JSON" --> SS
+    C2 -- "TCP: HTTP/1.1 + JSON" --> SS
+    SS -- "crea una Task" --> CH
+    CH -- "await" --> RR
+    RR --> RP
+    CH -- "await" --> RD
+    RD -- "fil del ThreadPool" --> RT
+    RT --> SV
+    SV --> UOW
+    UOW -- "SQL bloquejant" --> DB
+    RT --> RB
 ```
 
----
+## 3. Diagrama de seqüència: 2 clients concurrents
 
-## 3. Diagrama de Seqüència Multiclient
-
-El següent diagrama il·lustra el comportament quan dos clients interactuen simultàniament amb el servidor:
+![Diagrama de seqüència](img/sequence.png)
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor ClientA as Client A (GET /categories)
-    actor ClientB as Client B (GET /dishes)
-    participant Loop as Event Loop (Single Thread)
-    participant HandlerA as Task Client A
-    participant HandlerB as Task Client B
-    participant Dispatcher as RequestDispatcher (to_thread)
-    participant ThreadPool as ThreadPoolExecutor
+    participant A as Client A
+    participant B as Client B
+    participant EL as Event loop (1 fil)
+    participant TP as Fil del ThreadPool
     participant DB as PostgreSQL
 
-    ClientA->>Loop: Connexió TCP
-    Loop->>HandlerA: Crea Task Client A
-    ClientB->>Loop: Connexió TCP
-    Loop->>HandlerB: Crea Task Client B
-
-    Note over HandlerA,HandlerB: Ambdós clients són atesos concurrentment
-
-    ClientA->>HandlerA: Envia HTTP GET /categories
-    ClientB->>HandlerB: Envia HTTP GET /dishes
-
-    HandlerA->>Dispatcher: dispatch(req_A)
-    Dispatcher->>ThreadPool: Executa router.handle_request en un fil
-    ThreadPool->>DB: SELECT * FROM categories (Bloquejant)
-
-    Note over Loop: L'Event Loop no es bloqueja i atén el Client B!
-
-    HandlerB->>Dispatcher: dispatch(req_B)
-    Dispatcher->>ThreadPool: Executa router.handle_request en un fil
-    ThreadPool->>DB: SELECT * FROM dishes (Bloquejant)
-
-    DB-->>ThreadPool: Retorna files de categories
-    ThreadPool-->>Dispatcher: Retorna bytes HTTP 200 OK
-    Dispatcher-->>HandlerA: Retorna resposta
-    HandlerA->>ClientA: writer.write(response) + await drain()
-
-    DB-->>ThreadPool: Retorna files de plats
-    ThreadPool-->>Dispatcher: Retorna bytes HTTP 200 OK
-    Dispatcher-->>HandlerB: Retorna resposta
-    HandlerB->>ClientB: writer.write(response) + await drain()
+    A->>EL: connecta (start_server crea la Task A)
+    B->>EL: connecta (start_server crea la Task B)
+    A->>EL: GET /dishes
+    Note over EL: Task A: await read_request()
+    EL->>TP: Task A: await to_thread(router.handle_request)
+    TP->>DB: SELECT ... (bloqueja NOMÉS aquest fil)
+    B->>EL: GET /categories
+    Note over EL: L'event loop està lliure i atén la Task B
+    EL->>TP: Task B: await to_thread(router.handle_request)
+    TP->>DB: SELECT ...
+    DB-->>TP: files de plats
+    TP-->>EL: bytes HTTP 200
+    EL-->>A: write() + await drain(), close()
+    DB-->>TP: files de categories
+    TP-->>EL: bytes HTTP 200
+    EL-->>B: write() + await drain(), close()
 ```
 
----
+## 4. Abans vs després
 
-## 4. Gestió del Cicle de Vida i Robustesa
+![Abans vs després](img/before_after.png)
 
-1. **Timeouts de Lectura (`READ_TIMEOUT_SECONDS = 5.0`):**
-   Si una connexió roman inactiva sense enviar una petició completa durant el lapse establert, el servidor llança `TimeoutError` i respon amb un codi **408 Request Timeout**, tancant el socket immediatament.
+```mermaid
+flowchart LR
+    subgraph P1["P1: socket bloquejant"]
+        direction TB
+        X1["accept() client 1"] --> X2["recv() espera... (bloquejat)"] --> X3["resposta, close()"] --> X4["accept() client 2"]
+    end
+    subgraph P2["P2: asyncio"]
+        direction TB
+        Y0["event loop"] --> Y1["Task client 1"]
+        Y0 --> Y2["Task client 2"]
+        Y0 --> Y3["Task client N"]
+    end
+```
 
-2. **Límit de Cos (`MAX_BODY_SIZE = 1 MB`):**
-   Si la capçalera `Content-Length` supera el límit configurat, s'aborta la lectura abans de consumir memòria excessiva i es retorna un codi **413 Payload Too Large**.
+## 5. Fitxer → responsabilitat
 
-3. **Límit Màxim de Connexions Concurrents (`MAX_CONNECTIONS = 50`):**
-   Si el nombre de tasques de client actives supera la capacitat configurada, es rebutja l'admissió enviant un codi **503 Service Unavailable**.
+| Fitxer | Responsabilitat |
+|---|---|
+| `server/server.py` | Munta les peces i arrenca `asyncio.start_server` (`async with server` + `serve_forever`) |
+| `server/src/network/connection_handler.py` | La vida d'UNA connexió: llegir → processar → respondre → tancar |
+| `server/src/network/request_dispatcher.py` | Treu la BD (bloquejant) de l'event loop amb `to_thread` + `Semaphore` |
+| `server/src/protocol/async_request_reader.py` | `read_request()`: llegeix una petició HTTP del `StreamReader` (capçaleres + `Content-Length`) |
+| `server/src/protocol/request_parser.py` | `RequestParser`: funcions pures, bytes → `HttpRequest` |
+| `server/src/protocol/router.py` | `Router`: decideix quin servei crida segons mètode i ruta (codi de la P1) |
+| `server/src/protocol/response_builder.py` | `ResponseBuilder`: construeix els bytes de la resposta HTTP (200, 404, 408, 413, 503...) |
+| `server/src/services/` | Lògica de negoci i validacions (codi de la P1, sense canvis) |
+| `server/src/persistence/` | Models ORM, repositoris, Unit of Work i l'únic *engine* de SQLAlchemy |
+| `server/src/bootstrap.py` | Connecta les capes: persistència → serveis → router |
 
-4. **Tancament Net (*Graceful Shutdown*):**
-   En prémer `Ctrl+C`, el mètode `shutdown()` tanca primer el socket servidor perquè no entrin més clients i atorga un marge de fins a 5 segons perquè les tasques pendents puguin acabar netament.
+## 6. Cicle de vida d'una connexió
+
+Protocol *stateless*: **1 connexió = 1 petició**.
+
+1. El client connecta i `asyncio.start_server` crea una **Task nova** que executa `handle_client(reader, writer)`.
+2. Si ja hi ha massa connexions actives, es respon **503** directament.
+3. `read_request()` llegeix la petició dins `asyncio.timeout(READ_TIMEOUT_SECONDS)`.
+4. `dispatcher.dispatch(request)` espera un lloc al semàfor i executa el Router amb `asyncio.to_thread`.
+5. `writer.write(response)` + `await writer.drain()` (*backpressure*).
+6. `finally`: `writer.close()` + `await writer.wait_closed()`. El socket es tanca **sempre**, fins i tot si hi ha hagut errors.
+
+Un error inesperat només fa fallar la Task d'aquell client: el servidor continua atenent els altres.
+
+| Límit (`.env`) | Valor per defecte | Què passa si se supera |
+|---|---|---|
+| `READ_TIMEOUT_SECONDS` | 5 s | **408** Request Timeout |
+| `MAX_BODY_SIZE` | 1 MB | **413** Payload Too Large |
+| `MAX_CONNECTIONS` | 50 | **503** Service Unavailable |
+| `DB_MAX_CONCURRENCY` | 5 (= `pool_size` de SQLAlchemy) | La petició espera torn al `Semaphore` (sense bloquejar el loop) |
+
+## 7. Graceful shutdown
+
+1. Ctrl+C fa que `asyncio.run` cancel·li la Task `main()`.
+2. `serve_forever()` rep la cancel·lació.
+3. En sortir de l'`async with server`, s'executen `server.close()` i `wait_closed()`: es deixen d'acceptar clients i es tanca el socket d'escolta.
+4. Al `finally` de `main()`, `engine.dispose()` tanca les connexions de la BD.
+5. `asyncio.run` rellança `KeyboardInterrupt`, que s'ignora al `__main__`. El servidor acaba amb `Server stopped, resources released` i sense *traceback*.
+
+`CancelledError` **no** es captura enlloc: és `BaseException`, no entra a `except Exception`, i per això la cancel·lació funciona sola.

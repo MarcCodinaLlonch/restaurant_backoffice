@@ -1,7 +1,8 @@
-# Step-by-Step Guide: How to Run and Test Restaurant BackOffice v2.0
+# Step-by-Step Guide: How to Run and Test Restaurant BackOffice v3.0
 
 > 🌐 **Language:** **English (EXECUTION_GUIDE_ENG.md)** | [Català (EXECUTION_GUIDE_CAT.md)](EXECUTION_GUIDE_CAT.md)  
-> Complete tutorial to run the Client/Server application, execute automated tests, and verify all features.
+> Complete tutorial to run the Client/Server application, execute automated tests, and verify all features.  
+> Architecture of the asyncio server (v3.0): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
@@ -18,7 +19,8 @@ cd restaurant_backoffice
 
 1. **Activate the Python virtual environment:**
    ```bash
-   source .venv/bin/activate
+   .venv\Scripts\activate          # Windows
+   source .venv/bin/activate       # Linux / macOS
    ```
 
 2. **Verify the PostgreSQL Docker container is running:**
@@ -32,41 +34,37 @@ cd restaurant_backoffice
 
 ## STEP 2: Execute Automated Test Suite
 
-Before manually launching the applications, run the complete test suite to ensure all services, router, and sockets pass:
+Before manually launching the applications, run the complete test suite to ensure all services, router, protocol and multi-client scenarios pass:
 
 ```bash
 pytest -v
 ```
 
 **Expected Output:**
-A green list confirming **21 tests passed (100% PASSED)** in less than a second:
-- Real TCP client-server socket communication.
+A green list confirming **47 tests passed (100% PASSED)** in about one second:
+- Real multi-client scenarios against the asyncio server (20 concurrent clients, idle client, slow DB, 408/400/413/503).
 - HTTP stream parsing and response framing.
 - Business logic across all domain services using Mocks.
 - Router dispatching and 404 error handling.
 
 ---
 
-## STEP 3: Start the TCP Server (Terminal 1)
+## STEP 3: Start the asyncio Server (Terminal 1)
 
 Open your **first terminal window** (e.g., "Server Terminal"):
 
 ```bash
-source .venv/bin/activate
+.venv\Scripts\activate          # Windows
+source .venv/bin/activate       # Linux / macOS
 python server/server.py
 ```
 
 **Expected Console Output:**
 ```text
-[*] Inicialitzant serveis i connexió a la BD (localhost:5433/restaurant_db_dev)...
-============================================================
- RESTAURANT BACKOFFICE — SERVIDOR TCP EN EXECUCIÓ
- Escoltant a: http://0.0.0.0:8088/
- Protocol: HTTP/1.1 REST sobre TCP (Sockets bloquejants)
- Prem Ctrl+C per aturar el servidor.
-============================================================
+HH:MM:SS [INFO] server.src.bootstrap: Database ready
+HH:MM:SS [INFO] server: Listening on 0.0.0.0:8088 (Ctrl+C to stop)
 ```
-> ⏸️ **Leave this terminal open.** The server is actively waiting for client connections on port `8088`.
+> ⏸️ **Leave this terminal open.** The server is waiting for client connections on port `8088` and serves many clients concurrently (one asyncio Task per client).
 
 ---
 
@@ -75,7 +73,8 @@ python server/server.py
 Open a **second terminal window** (or split your VS Code terminal with `Ctrl + Shift + 5`):
 
 ```bash
-source .venv/bin/activate
+.venv\Scripts\activate          # Windows
+source .venv/bin/activate       # Linux / macOS
 python client/client.py
 ```
 
@@ -173,8 +172,7 @@ Content-Length: 182
 ## STEP 7: Gracefully Stopping the System
 
 1. **In Client Terminal (Terminal 2):** Press `0` at the main menu. The client prints `Fins aviat!` and exits.
-2. **In Server Terminal (Terminal 1):** Press `Ctrl + C`. The server cleanly shuts down and releases the socket:
+2. **In Server Terminal (Terminal 1):** Press `Ctrl + C`. The server shuts down cleanly (no traceback):
    ```text
-   [*] Aturant el servidor per petició de l'usuari...
-   [*] Servidor aturat correctament.
+   HH:MM:SS [INFO] server: Server stopped, resources released
    ```

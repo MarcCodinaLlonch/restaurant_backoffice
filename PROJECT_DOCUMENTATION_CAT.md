@@ -1,8 +1,9 @@
-# Documentació d'Estudi, Repàs i Arquitectura — Restaurant BackOffice v2.0
+# Documentació d'Estudi, Repàs i Arquitectura — Restaurant BackOffice v3.0
 
 > 🌐 **Idioma:** [English (PROJECT_DOCUMENTATION_ENG.md)](PROJECT_DOCUMENTATION_ENG.md) | **Català (PROJECT_DOCUMENTATION_CAT.md)**  
 > **Guia completa per a estudiants de 2n de DAM (Desenvolupament d'Aplicacions Multiplataforma)**  
-> Mòduls implicats: M0486 (Accés a Dades), M0487 (Programació de Serveis i Processos) i M0488 (Sistemes de Gestió Empresarial).
+> Mòduls implicats: M0486 (Accés a Dades), M0487 (Programació de Serveis i Processos) i M0488 (Sistemes de Gestió Empresarial).  
+> **v3.0 (Pràctica 2):** ara el servidor és asíncron (`asyncio.start_server`, una Task per client). El protocol i la capa de negoci que es descriuen aquí no han canviat. Vegeu [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
@@ -106,11 +107,15 @@ restaurant_backoffice/
 │       └── entities.py              # Classes pures (CategoryEntity, DishEntity, etc.)
 │
 ├── server/                          # COSTAT SERVIDOR
-│   ├── server.py                    # Bucle principal del socket TCP
+│   ├── server.py                    # Punt d'entrada: asyncio.start_server + serve_forever
 │   └── src/
+│       ├── bootstrap.py             # Connecta persistència -> serveis -> router
+│       ├── network/                 # CAPA DE XARXA ASYNCIO (v3.0)
+│       │   ├── connection_handler.py # Una Task per client: llegir -> processar -> respondre -> tancar
+│       │   └── request_dispatcher.py # Executa el Router en un fil (to_thread + Semaphore)
 │       ├── persistence/             # PERSISTÈNCIA (NOMÉS SERVIDOR)
 │       │   ├── config.py            # Configuració de BD i ports
-│       │   ├── db.py                # Engine i Base de SQLAlchemy
+│       │   ├── db.py                # Base declarativa de SQLAlchemy (l'engine és a UnitOfWorkFactory)
 │       │   ├── models.py            # Models ORM (Employee, Dish, Sale...)
 │       │   ├── repositories.py      # CRUD i consultes SQL
 │       │   ├── unit_of_work.py      # Gestor transaccional (UoW)
@@ -123,12 +128,14 @@ restaurant_backoffice/
 │       │   ├── menu_service.py
 │       │   └── sale_service.py
 │       └── protocol/                # PROTOCOL HTTP SOBRE TCP
-│           ├── request_parser.py    # Descodifica bytes TCP a HttpRequest
+│           ├── async_request_reader.py # Llegeix una petició d'un StreamReader d'asyncio
+│           ├── request_parser.py    # Funcions pures: bytes -> HttpRequest
 │           ├── response_builder.py  # Construeix respostes HTTP en bytes
 │           └── router.py            # Enrutador de peticions cap als serveis
 │
 ├── client/                          # COSTAT CLIENT
 │   ├── client.py                    # Punt d'entrada del client
+│   ├── load_test_client.py          # Llançador automàtic de clients (concurrent / seqüencial)
 │   └── src/
 │       ├── protocol/
 │       │   └── http_client.py       # Client TCP que parla HTTP/1.1
@@ -145,7 +152,8 @@ restaurant_backoffice/
 │   ├── test_response_builder.py     # Tests de construcció de respostes
 │   ├── test_services.py             # Tests de lògica de negoci amb Mocks
 │   ├── test_router.py               # Tests d'enrutament
-│   └── test_client_server_integration.py # Prova real de socket TCP Client-Servidor
+│   ├── test_async_request_reader.py # Tests de la lectura asíncrona de peticions
+│   └── test_async_server.py         # Tests multiclient reals contra el servidor asyncio
 │
 ├── PROTOCOL_ENG.md                  # Especificació tècnica del protocol (Anglès)
 ├── PROTOCOL_CAT.md                  # Especificació tècnica del protocol (Català)
@@ -247,12 +255,12 @@ docker-compose up -d
 ```
 
 ### Pas 3: Executar les proves automatitzades
-Per verificar que tota la suite de tests (lògica, protocol, router, sockets) funciona al 100%:
+Per verificar que tota la suite de tests (lògica, protocol, router, multiclient) funciona al 100%:
 ```bash
 pytest -v
 ```
 
-### Pas 4: Iniciar el Servidor TCP
+### Pas 4: Iniciar el Servidor asyncio
 En una finestra de terminal:
 ```bash
 python server/server.py
