@@ -1,6 +1,16 @@
 """
-load_test_client.py: Client de càrrega asíncron per demostrar la concurrència del servidor.
-Simula múltiples clients concurrents realitzant peticions simultànies amb asyncio.gather.
+load_test_client.py: Llançador automàtic de clients per DEMOSTRAR la concurrència.
+
+Ús:
+    python client/load_test_client.py --clients 20                 # 20 clients alhora
+    python client/load_test_client.py --clients 20 --sequential    # un darrere l'altre
+    python client/load_test_client.py --clients 20 --idle-clients 3
+
+CONCEPTES (diapositives d'asyncio):
+- asyncio.open_connection(): client TCP asíncron (StreamReader + StreamWriter).
+- asyncio.gather(): llança N coroutines alhora i espera que acabin totes.
+- Mode --sequential: "dos await seguits NO són concurrents" -> serveix per comparar temps.
+- asyncio.create_task(): els clients inactius s'executen en segon pla mentre fem la prova.
 """
 
 import argparse
@@ -9,187 +19,95 @@ import os
 import sys
 import time
 
-# Assegurem la ruta de project_root
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(current_dir)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from rich.console import Console
-from rich.table import Table
+from rich.console import Console  # noqa: E402
+from rich.table import Table  # noqa: E402
 
-from client.src.protocol.http_client import ApiResponse, decode_response, encode_request
+from client.src.protocol.http_client import decode_response, encode_request  # noqa: E402
 
 console = Console()
 
 
-async def send_async_request(
-    client_id: int,
-    host: str,
-    port: int,
-    method: str,
-    path: str,
-    body: any = None,
-) -> tuple[int, ApiResponse, float]:
-    """
-    Executa una petició HTTP/1.1 asíncrona utilitzant asyncio.open_connection
-    i mesura la latència individual en segons.
-    """
-    start_time = time.perf_counter()
+async def send_request(host: str, port: int, path: str) -> tuple[int, float]:
+    """Un client: connecta, envia un GET, llegeix la resposta. Retorna (codi HTTP, segons)."""
+    start = time.perf_counter()
     try:
         reader, writer = await asyncio.open_connection(host, port)
-        request_bytes = encode_request(method, path, host, port, body)
-        writer.write(request_bytes)
+        writer.write(encode_request("GET", path, host, port))
         await writer.drain()
-
-        # Llegim la resposta completa fins a EOF
-        raw_response = await reader.read()
+        raw_response = await reader.read()  # el servidor tanca en acabar (Connection: close)
         writer.close()
         await writer.wait_closed()
-
-        latency = time.perf_counter() - start_time
-        response = decode_response(raw_response)
-        return client_id, response, latency
-
-    except Exception as exc:
-        latency = time.perf_counter() - start_time
-        return (
-            client_id,
-            ApiResponse(status_code=500, data=None, error_message=str(exc)),
-            latency,
-        )
+        status_code = decode_response(raw_response).status_code
+    except OSError:
+        status_code = 0  # no s'ha pogut connectar
+    return status_code, time.perf_counter() - start
 
 
-async def idle_client(
-    client_id: int, host: str, port: int, hold_seconds: float
-) -> None:
-    """Simula un client connectat que no envia res per comprovar que no bloqueja els altres."""
-    try:
-        reader, writer = await asyncio.open_connection(host, port)
-        await asyncio.sleep(hold_seconds)
-        writer.close()
-        await writer.wait_closed()
-    except Exception:
-        pass
+async def idle_client(host: str, port: int, seconds: float) -> None:
+    """Client "mut": connecta i no envia res. Demostra que no bloqueja els altres."""
+    _, writer = await asyncio.open_connection(host, port)
+    await asyncio.sleep(seconds)
+    writer.close()
+    await writer.wait_closed()
 
 
-async def run_load_test(
-    host: str,
-    port: int,
-    num_clients: int,
-    method: str,
-    path: str,
-    idle_clients: int = 0,
-) -> None:
-    console.print(
-        "\n[bold cyan]==============================================================[/bold cyan]"
-    )
-    console.print("[bold white] PROVA DE CÀRREGA ASÍNCRONA (AsyncIO)[/bold white]")
-    console.print(
-        f" Servidor: [yellow]{host}:{port}[/yellow] | Ruta: [green]{method} {path}[/green]"
-    )
-    console.print(
-        f" Clients concurrents: [bold green]{num_clients}[/bold green] | Clients inactius: [bold red]{idle_clients}[/bold red]"
-    )
-    console.print(
-        "[bold cyan]==============================================================[/bold cyan]\n"
-    )
-
-    overall_start = time.perf_counter()
-
-    # Tasques concurrents de càrrega
-    tasks = [
-        send_async_request(i + 1, host, port, method, path) for i in range(num_clients)
-    ]
-
-    # Si hi ha clients inactius simultanis
+async def run_load_test(args: argparse.Namespace) -> None:
+    # 1. Clients inactius en segon pla (create_task: s'executen mentre continuem).
     idle_tasks = [
-        idle_client(1000 + i, host, port, hold_seconds=2.0) for i in range(idle_clients)
+        asyncio.create_task(idle_client(args.host, args.port, seconds=3.0))
+        for _ in range(args.idle_clients)
     ]
+    await asyncio.sleep(0.1)  # ens assegurem que ja estan connectats
 
-    # Llançament concurrent simultani amb asyncio.gather
-    results = await asyncio.gather(*(tasks + idle_tasks))
-    overall_elapsed = time.perf_counter() - overall_start
+    # 2. Clients actius: tots alhora (gather) o un darrere l'altre (await en bucle).
+    start = time.perf_counter()
+    if args.sequential:
+        results = [
+            await send_request(args.host, args.port, args.path) for _ in range(args.clients)
+        ]
+    else:
+        results = await asyncio.gather(
+            *(send_request(args.host, args.port, args.path) for _ in range(args.clients))
+        )
+    total_time = time.perf_counter() - start
 
-    # Filtrem només els resultats dels clients normals
-    client_results: list[tuple[int, ApiResponse, float]] = [
-        r for r in results if r is not None
-    ]
+    await asyncio.gather(*idle_tasks)
+    show_results(args, results, total_time)
 
-    # Càlcul d'estadístiques
-    success_count = sum(1 for _, resp, _ in client_results if resp.is_success)
-    failed_count = len(client_results) - success_count
-    latencies = [lat for _, _, lat in client_results]
-    avg_latency = sum(latencies) / len(latencies) if latencies else 0.0
-    min_latency = min(latencies) if latencies else 0.0
-    max_latency = max(latencies) if latencies else 0.0
 
-    # Taula resum amb Rich
-    table = Table(
-        title="Resultats de la Prova de Concurrència",
-        show_header=True,
-        header_style="bold magenta",
-    )
-    table.add_column("Mètrica", style="bold white", width=30)
-    table.add_column("Valor", style="cyan", width=25)
+def show_results(
+    args: argparse.Namespace, results: list[tuple[int, float]], total_time: float
+) -> None:
+    """Mostra un resum en una taula Rich."""
+    successes = sum(1 for status, _ in results if 200 <= status < 300)
+    latencies = [latency for _, latency in results]
+    mode = "SEQÜENCIAL (un darrere l'altre)" if args.sequential else "CONCURRENT (gather)"
 
-    table.add_row("Clients simultanis sol·licitats", str(num_clients))
-    table.add_row(
-        "Peticions satisfetes amb èxit (2xx)",
-        f"[bold green]{success_count}[/bold green]",
-    )
-    table.add_row(
-        "Peticions fallades",
-        f"[bold red]{failed_count}[/bold red]" if failed_count > 0 else "0",
-    )
-    table.add_row("Temps total transcorregut", f"{overall_elapsed:.3f} s")
-    table.add_row("Latència mitjana per client", f"{avg_latency * 1000:.1f} ms")
-    table.add_row("Latència mínima", f"{min_latency * 1000:.1f} ms")
-    table.add_row("Latència màxima", f"{max_latency * 1000:.1f} ms")
-    table.add_row("Throughput estimat", f"{num_clients / overall_elapsed:.1f} req/s")
-
+    table = Table(title=f"Prova de càrrega — {mode}")
+    table.add_column("Mètrica")
+    table.add_column("Valor", style="cyan")
+    table.add_row("Petició", f"GET {args.path}")
+    table.add_row("Clients actius / inactius", f"{args.clients} / {args.idle_clients}")
+    table.add_row("Respostes correctes (2xx)", f"{successes} / {len(results)}")
+    table.add_row("Temps total", f"{total_time:.3f} s")
+    table.add_row("Latència mitjana", f"{sum(latencies) / len(latencies) * 1000:.1f} ms")
+    table.add_row("Latència màxima", f"{max(latencies) * 1000:.1f} ms")
     console.print(table)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Client de prova de càrrega asíncron.")
-    parser.add_argument(
-        "--host", default="127.0.0.1", help="Host del servidor (default: 127.0.0.1)"
-    )
-    parser.add_argument(
-        "--port", type=int, default=8088, help="Port del servidor (default: 8088)"
-    )
-    parser.add_argument(
-        "--clients",
-        type=int,
-        default=20,
-        help="Nombre de clients concurrents (default: 20)",
-    )
-    parser.add_argument("--method", default="GET", help="Mètode HTTP (default: GET)")
-    parser.add_argument(
-        "--path",
-        default="/categories",
-        help="Ruta de l'endpoint (default: /categories)",
-    )
-    parser.add_argument(
-        "--idle-clients",
-        type=int,
-        default=2,
-        help="Nombre de clients inactius simultanis (default: 2)",
-    )
-
-    args = parser.parse_args()
-
-    asyncio.run(
-        run_load_test(
-            host=args.host,
-            port=args.port,
-            num_clients=args.clients,
-            method=args.method,
-            path=args.path,
-            idle_clients=args.idle_clients,
-        )
-    )
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Llançador de clients concurrents.")
+    parser.add_argument("--host", default=os.getenv("SERVER_HOST_CLIENT", "127.0.0.1"))
+    parser.add_argument("--port", type=int, default=int(os.getenv("SERVER_PORT", "8088")))
+    parser.add_argument("--clients", type=int, default=20)
+    parser.add_argument("--path", default="/dishes")
+    parser.add_argument("--idle-clients", type=int, default=0)
+    parser.add_argument("--sequential", action="store_true")
+    asyncio.run(run_load_test(parser.parse_args()))
 
 
 if __name__ == "__main__":

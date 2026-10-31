@@ -21,6 +21,7 @@ async def run_sequential() -> None:
     result1 = await fetch_data("Font A", 2.0)
     result2 = await fetch_data("Font B", 2.0)
     elapsed = time.perf_counter() - start
+    print(f"Resultats: {result1}, {result2}")
     print(f"Temps total seqüencial: {elapsed:.2f} segons (esperat: ~4.0s)")
 
 
@@ -33,6 +34,7 @@ async def run_concurrent() -> None:
         fetch_data("Font B", 2.0),
     )
     elapsed = time.perf_counter() - start
+    print(f"Resultats: {result1}, {result2}")
     print(f"Temps total concurrent: {elapsed:.2f} segons (esperat: ~2.0s)")
 
 
