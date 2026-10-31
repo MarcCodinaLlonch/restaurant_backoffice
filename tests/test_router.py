@@ -99,3 +99,48 @@ def test_router_unknown_route_returns_404(mock_router):
 
     resp_bytes = router.handle_request(req)
     assert resp_bytes.startswith(b"HTTP/1.1 404 Not Found")
+
+
+def make_request(method: str, path: str, body: dict | None = None) -> HttpRequest:
+    """Crea un HttpRequest de prova sense passar per la xarxa."""
+    return HttpRequest(method=method, path=path, raw_path=path, version="HTTP/1.1", body=body)
+
+
+def test_router_get_missing_category_returns_404(mock_router):
+    router, category_service, _ = mock_router
+    category_service.get_by_id.return_value = None
+
+    response = router.handle_request(make_request("GET", "/categories/99"))
+
+    assert response.startswith(b"HTTP/1.1 404 Not Found")
+    category_service.get_by_id.assert_called_once_with(99)
+
+
+def test_router_delete_category_returns_204(mock_router):
+    router, category_service, _ = mock_router
+    category_service.delete.return_value = True
+
+    response = router.handle_request(make_request("DELETE", "/categories/3"))
+
+    assert response.startswith(b"HTTP/1.1 204 No Content")
+
+
+def test_router_add_allergen_to_dish(mock_router):
+    router, _, dish_service = mock_router
+    dish_service.add_allergen.return_value = True
+
+    response = router.handle_request(
+        make_request("POST", "/dishes/5/allergens", {"id_allergen": 2})
+    )
+
+    assert response.startswith(b"HTTP/1.1 200 OK")
+    dish_service.add_allergen.assert_called_once_with(5, 2)
+
+
+def test_router_unexpected_service_error_returns_500(mock_router):
+    router, category_service, _ = mock_router
+    category_service.get_all.side_effect = RuntimeError("database down")
+
+    response = router.handle_request(make_request("GET", "/categories"))
+
+    assert response.startswith(b"HTTP/1.1 500 Internal Server Error")

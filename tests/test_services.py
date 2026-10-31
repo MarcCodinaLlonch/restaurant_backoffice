@@ -5,6 +5,7 @@ from datetime import date
 from unittest.mock import MagicMock
 import pytest
 
+from server.src.services.allergen_service import AllergenService
 from server.src.services.category_service import CategoryService
 from server.src.services.employee_service import EmployeeService
 from server.src.services.dish_service import DishService
@@ -91,3 +92,18 @@ def test_sale_service_create_negative_quantity(mock_uow_factory):
 
     with pytest.raises(ValueError, match="La quantitat venuda ha de ser superior a 0"):
         service.create(id_menu=1, id_employee=1, sale_date_val=date.today(), quantity_sold=-2)
+
+
+def test_allergen_service_create_empty_name_raises_error(mock_uow_factory):
+    """No es permet crear un al·lèrgen sense nom."""
+    factory, _ = mock_uow_factory
+    with pytest.raises(ValueError):
+        AllergenService(factory).create("   ")
+
+
+def test_category_service_delete_missing_returns_false(mock_uow_factory):
+    """Esborrar una categoria inexistent retorna False (el Router ho converteix en 404)."""
+    factory, uow = mock_uow_factory
+    uow.categories.get.return_value = None
+    assert CategoryService(factory).delete(42) is False
+    uow.categories.delete.assert_not_called()
