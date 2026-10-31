@@ -9,19 +9,19 @@
 # - Si la ruta no coincideix amb cap servei -> 404 Not Found.
 # - Retorna la resposta formatejada en bytes gràcies a ResponseBuilder.
 
-import re
 from datetime import date
-from typing import Optional
-from .request_parser import HttpRequest
-from .response_builder import ResponseBuilder
+
 from server.src.services import (
-    CategoryService,
     AllergenService,
+    CategoryService,
     DishService,
     EmployeeService,
     MenuService,
     SaleService,
 )
+
+from .request_parser import HttpRequest
+from .response_builder import ResponseBuilder
 
 
 class Router:
@@ -64,7 +64,9 @@ class Router:
         try:
             # 1. RUTA ARREL / SALUTACIÓ
             if not parts:
-                return ResponseBuilder.ok({"status": "running", "message": "Restaurant BackOffice API v2.0"})
+                return ResponseBuilder.ok(
+                    {"status": "running", "message": "Restaurant BackOffice API v2.0"}
+                )
 
             resource = parts[0]
 
@@ -93,14 +95,16 @@ class Router:
                 return self._handle_sales(method, parts, req)
 
             # Recurs no reconegut
-            return ResponseBuilder.not_found(f"Recurs '{resource}' no trobat al servidor.")
+            return ResponseBuilder.not_found(
+                f"Recurs '{resource}' no trobat al servidor."
+            )
 
         except ValueError as ve:
             # Errors de validació de negoci controlats
             return ResponseBuilder.bad_request(str(ve))
         except Exception as ex:
             # Errors inesperats del servidor
-            return ResponseBuilder.internal_error(f"Error inesperat: {str(ex)}")
+            return ResponseBuilder.internal_error(f"Error inesperat: {ex!s}")
 
     # -------------------------------------------------------------------------
     # HANDLERS ESPECÍFICS PER A CADA RECURS
@@ -124,15 +128,27 @@ class Router:
             cat_id = int(parts[1])
             if method == "GET":
                 cat = self.categories.get_by_id(cat_id)
-                return ResponseBuilder.ok(cat) if cat else ResponseBuilder.not_found("Categoria no trobada.")
+                return (
+                    ResponseBuilder.ok(cat)
+                    if cat
+                    else ResponseBuilder.not_found("Categoria no trobada.")
+                )
             elif method == "PUT":
                 body = req.body or {}
                 nom = body.get("category_name", "")
                 cat = self.categories.update(cat_id, nom)
-                return ResponseBuilder.ok(cat) if cat else ResponseBuilder.not_found("Categoria no trobada.")
+                return (
+                    ResponseBuilder.ok(cat)
+                    if cat
+                    else ResponseBuilder.not_found("Categoria no trobada.")
+                )
             elif method == "DELETE":
                 ok = self.categories.delete(cat_id)
-                return ResponseBuilder.no_content() if ok else ResponseBuilder.not_found("Categoria no trobada.")
+                return (
+                    ResponseBuilder.no_content()
+                    if ok
+                    else ResponseBuilder.not_found("Categoria no trobada.")
+                )
 
         return ResponseBuilder.not_found("Ruta o mètode no suportat per a categories.")
 
@@ -154,15 +170,27 @@ class Router:
             al_id = int(parts[1])
             if method == "GET":
                 al = self.allergens.get_by_id(al_id)
-                return ResponseBuilder.ok(al) if al else ResponseBuilder.not_found("Al·lèrgen no trobat.")
+                return (
+                    ResponseBuilder.ok(al)
+                    if al
+                    else ResponseBuilder.not_found("Al·lèrgen no trobat.")
+                )
             elif method == "PUT":
                 body = req.body or {}
                 nom = body.get("allergen_name", "")
                 al = self.allergens.update(al_id, nom)
-                return ResponseBuilder.ok(al) if al else ResponseBuilder.not_found("Al·lèrgen no trobat.")
+                return (
+                    ResponseBuilder.ok(al)
+                    if al
+                    else ResponseBuilder.not_found("Al·lèrgen no trobat.")
+                )
             elif method == "DELETE":
                 ok = self.allergens.delete(al_id)
-                return ResponseBuilder.no_content() if ok else ResponseBuilder.not_found("Al·lèrgen no trobat.")
+                return (
+                    ResponseBuilder.no_content()
+                    if ok
+                    else ResponseBuilder.not_found("Al·lèrgen no trobat.")
+                )
 
         return ResponseBuilder.not_found("Ruta o mètode no suportat per a al·lèrgens.")
 
@@ -184,7 +212,7 @@ class Router:
                 dish_name=b.get("dish_name", ""),
                 id_category=int(b.get("id_category", 0)),
                 description=b.get("description"),
-                is_active=bool(b.get("is_active", True))
+                is_active=bool(b.get("is_active", True)),
             )
             return ResponseBuilder.created(dish)
 
@@ -193,7 +221,11 @@ class Router:
             d_id = int(parts[1])
             if method == "GET":
                 dish = self.dishes.get_by_id(d_id)
-                return ResponseBuilder.ok(dish) if dish else ResponseBuilder.not_found("Plat no trobat.")
+                return (
+                    ResponseBuilder.ok(dish)
+                    if dish
+                    else ResponseBuilder.not_found("Plat no trobat.")
+                )
             elif method == "PUT":
                 b = req.body or {}
                 dish = self.dishes.update(
@@ -201,15 +233,28 @@ class Router:
                     dish_name=b.get("dish_name"),
                     description=b.get("description"),
                     is_active=b.get("is_active"),
-                    id_category=b.get("id_category")
+                    id_category=b.get("id_category"),
                 )
-                return ResponseBuilder.ok(dish) if dish else ResponseBuilder.not_found("Plat no trobat.")
+                return (
+                    ResponseBuilder.ok(dish)
+                    if dish
+                    else ResponseBuilder.not_found("Plat no trobat.")
+                )
             elif method == "DELETE":
                 ok = self.dishes.delete(d_id)
-                return ResponseBuilder.no_content() if ok else ResponseBuilder.not_found("Plat no trobat.")
+                return (
+                    ResponseBuilder.no_content()
+                    if ok
+                    else ResponseBuilder.not_found("Plat no trobat.")
+                )
 
         # POST /dishes/{id}/allergens -> Afegir al·lèrgen a plat (relació N:M)
-        if len(parts) == 3 and parts[1].isdigit() and parts[2] == "allergens" and method == "POST":
+        if (
+            len(parts) == 3
+            and parts[1].isdigit()
+            and parts[2] == "allergens"
+            and method == "POST"
+        ):
             d_id = int(parts[1])
             b = req.body or {}
             al_id = int(b.get("id_allergen", 0))
@@ -226,7 +271,7 @@ class Router:
             elif "name" in req.query_params or "surname" in req.query_params:
                 emps = self.employees.search(
                     name=req.query_params.get("name", ""),
-                    surname=req.query_params.get("surname", "")
+                    surname=req.query_params.get("surname", ""),
                 )
             else:
                 emps = self.employees.get_all()
@@ -241,7 +286,7 @@ class Router:
                 national_id=b.get("national_id", ""),
                 role=b.get("role", ""),
                 email=b.get("email"),
-                password=b.get("password")
+                password=b.get("password"),
             )
             return ResponseBuilder.created(emp)
 
@@ -250,7 +295,11 @@ class Router:
             e_id = int(parts[1])
             if method == "GET":
                 emp = self.employees.get_by_id(e_id)
-                return ResponseBuilder.ok(emp) if emp else ResponseBuilder.not_found("Empleat no trobat.")
+                return (
+                    ResponseBuilder.ok(emp)
+                    if emp
+                    else ResponseBuilder.not_found("Empleat no trobat.")
+                )
             elif method == "PUT":
                 b = req.body or {}
                 emp = self.employees.update(
@@ -258,12 +307,20 @@ class Router:
                     name=b.get("name"),
                     surname=b.get("surname"),
                     national_id=b.get("national_id"),
-                    role=b.get("role")
+                    role=b.get("role"),
                 )
-                return ResponseBuilder.ok(emp) if emp else ResponseBuilder.not_found("Empleat no trobat.")
+                return (
+                    ResponseBuilder.ok(emp)
+                    if emp
+                    else ResponseBuilder.not_found("Empleat no trobat.")
+                )
             elif method == "DELETE":
                 ok = self.employees.delete(e_id)
-                return ResponseBuilder.no_content() if ok else ResponseBuilder.not_found("Empleat no trobat.")
+                return (
+                    ResponseBuilder.no_content()
+                    if ok
+                    else ResponseBuilder.not_found("Empleat no trobat.")
+                )
 
         return ResponseBuilder.not_found("Ruta o mètode no suportat per a empleats.")
 
@@ -284,8 +341,7 @@ class Router:
         if len(parts) == 1 and method == "POST":
             b = req.body or {}
             m = self.menus.create(
-                menu_name=b.get("menu_name", ""),
-                price=float(b.get("price", 0.0))
+                menu_name=b.get("menu_name", ""), price=float(b.get("price", 0.0))
             )
             return ResponseBuilder.created(m)
 
@@ -294,21 +350,38 @@ class Router:
             m_id = int(parts[1])
             if method == "GET":
                 m = self.menus.get_by_id(m_id)
-                return ResponseBuilder.ok(m) if m else ResponseBuilder.not_found("Menú no trobat.")
+                return (
+                    ResponseBuilder.ok(m)
+                    if m
+                    else ResponseBuilder.not_found("Menú no trobat.")
+                )
             elif method == "PUT":
                 b = req.body or {}
                 m = self.menus.update(
                     menu_id=m_id,
                     menu_name=b.get("menu_name"),
-                    price=float(b.get("price")) if b.get("price") is not None else None
+                    price=float(b.get("price")) if b.get("price") is not None else None,
                 )
-                return ResponseBuilder.ok(m) if m else ResponseBuilder.not_found("Menú no trobat.")
+                return (
+                    ResponseBuilder.ok(m)
+                    if m
+                    else ResponseBuilder.not_found("Menú no trobat.")
+                )
             elif method == "DELETE":
                 ok = self.menus.delete(m_id)
-                return ResponseBuilder.no_content() if ok else ResponseBuilder.not_found("Menú no trobat.")
+                return (
+                    ResponseBuilder.no_content()
+                    if ok
+                    else ResponseBuilder.not_found("Menú no trobat.")
+                )
 
         # POST /menus/{id}/dishes -> Afegir plat a menú (N:M)
-        if len(parts) == 3 and parts[1].isdigit() and parts[2] == "dishes" and method == "POST":
+        if (
+            len(parts) == 3
+            and parts[1].isdigit()
+            and parts[2] == "dishes"
+            and method == "POST"
+        ):
             m_id = int(parts[1])
             b = req.body or {}
             d_id = int(b.get("id_dish", 0))
@@ -316,11 +389,21 @@ class Router:
             return ResponseBuilder.ok({"added": ok})
 
         # DELETE /menus/{id}/dishes/{dish_id} -> Treure plat de menú (N:M)
-        if len(parts) == 4 and parts[1].isdigit() and parts[2] == "dishes" and parts[3].isdigit() and method == "DELETE":
+        if (
+            len(parts) == 4
+            and parts[1].isdigit()
+            and parts[2] == "dishes"
+            and parts[3].isdigit()
+            and method == "DELETE"
+        ):
             m_id = int(parts[1])
             d_id = int(parts[3])
             ok = self.menus.remove_dish(m_id, d_id)
-            return ResponseBuilder.no_content() if ok else ResponseBuilder.not_found("Relació Menú-Plat no trobada.")
+            return (
+                ResponseBuilder.no_content()
+                if ok
+                else ResponseBuilder.not_found("Relació Menú-Plat no trobada.")
+            )
 
         return ResponseBuilder.not_found("Ruta o mètode no suportat per a menús.")
 
@@ -353,7 +436,7 @@ class Router:
                 id_menu=int(b.get("id_menu", 0)),
                 id_employee=int(b.get("id_employee", 0)),
                 sale_date_val=d_val,
-                quantity_sold=int(b.get("quantity_sold", 1))
+                quantity_sold=int(b.get("quantity_sold", 1)),
             )
             return ResponseBuilder.created(sale)
 
@@ -365,14 +448,26 @@ class Router:
 
             if method == "GET":
                 sale = self.sales.get_by_pk(m_id, e_id, d_val)
-                return ResponseBuilder.ok(sale) if sale else ResponseBuilder.not_found("Venda no trobada.")
+                return (
+                    ResponseBuilder.ok(sale)
+                    if sale
+                    else ResponseBuilder.not_found("Venda no trobada.")
+                )
             elif method == "PUT":
                 b = req.body or {}
                 q_sold = int(b.get("quantity_sold", 1))
                 sale = self.sales.update(m_id, e_id, d_val, q_sold)
-                return ResponseBuilder.ok(sale) if sale else ResponseBuilder.not_found("Venda no trobada.")
+                return (
+                    ResponseBuilder.ok(sale)
+                    if sale
+                    else ResponseBuilder.not_found("Venda no trobada.")
+                )
             elif method == "DELETE":
                 ok = self.sales.delete(m_id, e_id, d_val)
-                return ResponseBuilder.no_content() if ok else ResponseBuilder.not_found("Venda no trobada.")
+                return (
+                    ResponseBuilder.no_content()
+                    if ok
+                    else ResponseBuilder.not_found("Venda no trobada.")
+                )
 
         return ResponseBuilder.not_found("Ruta o mètode no suportat per a vendes.")

@@ -8,7 +8,7 @@
 # 4. El cos (body) de dades, normalment JSON serialitzat en UTF-8.
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 
 class ResponseBuilder:
@@ -24,7 +24,7 @@ class ResponseBuilder:
         """
         if data is None:
             return None
-        if hasattr(data, "to_dict") and callable(getattr(data, "to_dict")):
+        if hasattr(data, "to_dict") and callable(data.to_dict):
             return data.to_dict()
         if isinstance(data, list):
             return [ResponseBuilder._serialize_data(item) for item in data]
@@ -97,6 +97,8 @@ class ResponseBuilder:
         return ResponseBuilder.build(413, "Payload Too Large", {"error": message})
 
     @staticmethod
-    def service_unavailable(message: str = "Servei no disponible temporalment") -> bytes:
+    def service_unavailable(
+        message: str = "Servei no disponible temporalment",
+    ) -> bytes:
         """503 Service Unavailable: El servidor ha assolit el límit màxim de connexions."""
         return ResponseBuilder.build(503, "Service Unavailable", {"error": message})

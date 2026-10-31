@@ -1,8 +1,8 @@
 # request_parser.py: Parser per analitzar les peticions HTTP sobre un socket TCP o StreamReader.
 import json
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional
-from urllib.parse import urlparse, parse_qs
+from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from .errors import ProtocolError
 
@@ -12,13 +12,14 @@ class HttpRequest:
     """
     Representa una petició HTTP ja analitzada i estructurada.
     """
-    method: str                              # GET, POST, PUT, DELETE, etc.
-    path: str                                # Ruta completa: /categories/1?sort=id
-    raw_path: str                            # Ruta sense query params: /categories/1
-    version: str                             # HTTP/1.1
-    headers: Dict[str, str] = field(default_factory=dict)
-    query_params: Dict[str, str] = field(default_factory=dict)
-    body: Optional[Any] = None               # Dades del cos en format diccionari/llista Python
+
+    method: str  # GET, POST, PUT, DELETE, etc.
+    path: str  # Ruta completa: /categories/1?sort=id
+    raw_path: str  # Ruta sense query params: /categories/1
+    version: str  # HTTP/1.1
+    headers: dict[str, str] = field(default_factory=dict)
+    query_params: dict[str, str] = field(default_factory=dict)
+    body: Any | None = None  # Dades del cos en format diccionari/llista Python
 
 
 class RequestParser:
@@ -46,7 +47,7 @@ class RequestParser:
         path = first_line_parts[1]
         version = first_line_parts[2] if len(first_line_parts) > 2 else "HTTP/1.1"
 
-        headers: Dict[str, str] = {}
+        headers: dict[str, str] = {}
         for line in lines[1:]:
             if ":" in line:
                 key, val = line.split(":", 1)
@@ -64,7 +65,7 @@ class RequestParser:
             version=version,
             headers=headers,
             query_params=query_params,
-            body=None
+            body=None,
         )
 
     @staticmethod
@@ -83,7 +84,7 @@ class RequestParser:
         return text
 
     @staticmethod
-    def parse_bytes(data: bytes) -> Optional[HttpRequest]:
+    def parse_bytes(data: bytes) -> HttpRequest | None:
         """
         Mètode auxiliar pur (útil per a tests): rep els bytes sencers d'una petició
         i reutilitza parse_head i parse_body.
@@ -110,7 +111,7 @@ class RequestParser:
         return request
 
     @staticmethod
-    def parse_from_socket(client_socket, timeout: float = 5.0) -> Optional[HttpRequest]:
+    def parse_from_socket(client_socket, timeout: float = 5.0) -> HttpRequest | None:
         """
         Llegeix pas a pas d'un socket síncron reutilitzant parse_head i parse_body.
         (Manté retrocompatibilitat amb la P1).
@@ -135,7 +136,7 @@ class RequestParser:
             remaining_body = b""
         else:
             head_bytes = bytes(buffer[:header_end])
-            remaining_body = bytes(buffer[header_end + 4:])
+            remaining_body = bytes(buffer[header_end + 4 :])
 
         try:
             request = RequestParser.parse_head(head_bytes)
@@ -157,7 +158,7 @@ class RequestParser:
 
             request.body = RequestParser.parse_body(
                 bytes(body_bytes[:content_length]),
-                request.headers.get("content-type", "")
+                request.headers.get("content-type", ""),
             )
 
         return request

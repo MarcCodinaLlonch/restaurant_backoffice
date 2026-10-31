@@ -1,24 +1,24 @@
 """
 async_request_reader.py: Lector asíncron de peticions HTTP sobre asyncio.StreamReader.
 """
-import asyncio
-from typing import Optional
 
-from .errors import ProtocolError, PayloadTooLargeError
+import asyncio
+
+from .errors import PayloadTooLargeError, ProtocolError
 from .request_parser import HttpRequest, RequestParser
 
 
 async def read_request(
     reader: asyncio.StreamReader,
     max_body_size: int = 1_048_576,  # 1 MB per defecte
-) -> Optional[HttpRequest]:
+) -> HttpRequest | None:
     """
     Llegeix una petició HTTP/1.1 completa d'un StreamReader.
-    
+
     Retorna:
         - HttpRequest si la petició s'ha llegit i analitzat correctament.
         - None si el client ha tancat la connexió de manera neta (EOF) sense enviar dades.
-        
+
     Llança:
         - ProtocolError: Si les capçaleres estan mal formades, incompletes o superen el límit.
         - PayloadTooLargeError: Si el Content-Length supera max_body_size.

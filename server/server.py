@@ -15,8 +15,16 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from server.src import bootstrap
-from server.src.network import AsyncTcpServer, ClientConnectionHandler
-from server.src.persistence.config import DB_URL, SERVER_HOST, SERVER_PORT
+from server.src.network import AsyncTcpServer, ClientConnectionHandler, RequestDispatcher
+from server.src.persistence.config import (
+    DB_URL,
+    SERVER_HOST,
+    SERVER_PORT,
+    READ_TIMEOUT_SECONDS,
+    MAX_BODY_SIZE,
+    MAX_CONNECTIONS,
+    DB_MAX_CONCURRENCY,
+)
 
 # Configuració de logging professional (reemplaça els antics print)
 logging.basicConfig(
@@ -39,14 +47,22 @@ async def main() -> None:
     # 1. Inicialitzem la base de dades
     bootstrap.init_database(DB_URL)
 
-    # 2. Creem l'enrutador amb tots els serveis
+    # 2. Creem l'enrutador amb tots els serveis i el despatxador fora de l'Event Loop
     router = bootstrap.create_router(DB_URL)
+    dispatcher = RequestDispatcher(router, max_concurrent_calls=DB_MAX_CONCURRENCY)
 
-    # 3. Creem el controlador de connexions i el servidor asíncron
-    handler = ClientConnectionHandler(router)
+    # 3. Creem el controlador de connexions amb límits i timeouts de seguretat
+    handler = ClientConnectionHandler(
+        dispatcher=dispatcher,
+        max_body_size=MAX_BODY_SIZE,
+        read_timeout=READ_TIMEOUT_SECONDS,
+        max_connections=MAX_CONNECTIONS,
+    )
+
+    # 4. Instanciem el servidor asíncron amb suport per a Graceful Shutdown
     server = AsyncTcpServer(SERVER_HOST, SERVER_PORT, handler)
 
-    # 4. Comencem a escoltar peticions indefinidament
+    # 5. Comencem a escoltar peticions indefinidament
     await server.serve_forever()
 
 

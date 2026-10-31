@@ -17,3 +17,9 @@ DB_URL = {
 # Configuració de la xarxa per al Servidor TCP
 SERVER_HOST = os.getenv("SERVER_HOST", "0.0.0.0")
 SERVER_PORT = int(os.getenv("SERVER_PORT", "8088"))
+
+# Límits i timeouts de concurrència i seguretat (AsyncIO)
+READ_TIMEOUT_SECONDS = float(os.getenv("READ_TIMEOUT_SECONDS", "5.0"))
+MAX_BODY_SIZE = int(os.getenv("MAX_BODY_SIZE", "1048576"))        # 1 MB
+MAX_CONNECTIONS = int(os.getenv("MAX_CONNECTIONS", "50"))
+DB_MAX_CONCURRENCY = int(os.getenv("DB_MAX_CONCURRENCY", "10"))
