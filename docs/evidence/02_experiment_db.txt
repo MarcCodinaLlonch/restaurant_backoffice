@@ -1,0 +1,7 @@
+$ python experiments/03_blocking_vs_offloaded.py
+10 clients simultanis, cada consulta tarda 0.2 s
+
+  inline    (BD dins l'event loop): 2.01 s
+  to_thread (BD en un fil):         0.21 s
+
+  to_thread és 9.6 vegades més ràpid

@@ -1,0 +1,76 @@
+# Demo 3: llançador automàtic, 30 clients, mode concurrent (gather) vs seqüencial
+
+## A) SQLite (ENVIRONMENT=test DB_URL_TESTS=sqlite:///demo.db SERVER_PORT=8099)
+$ python client/load_test_client.py --port 8099 --clients 30
+  Prova de càrrega — CONCURRENT (gather)   
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ Mètrica                   ┃ Valor       ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ Petició                   │ GET /dishes │
+│ Clients actius / inactius │ 30 / 0      │
+│ Respostes correctes (2xx) │ 30 / 30     │
+│ Temps total               │ 0.403 s     │
+│ Latència mitjana          │ 233.2 ms    │
+│ Latència màxima           │ 396.3 ms    │
+└───────────────────────────┴─────────────┘
+$ python client/load_test_client.py --port 8099 --clients 30 --sequential
+ Prova de càrrega — SEQÜENCIAL (un darrere 
+                 l'altre)                  
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ Mètrica                   ┃ Valor       ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ Petició                   │ GET /dishes │
+│ Clients actius / inactius │ 30 / 0      │
+│ Respostes correctes (2xx) │ 30 / 30     │
+│ Temps total               │ 0.351 s     │
+│ Latència mitjana          │ 11.7 ms     │
+│ Latència màxima           │ 15.0 ms     │
+└───────────────────────────┴─────────────┘
+$ python client/load_test_client.py --port 8099 --clients 30 --idle-clients 3
+  Prova de càrrega — CONCURRENT (gather)   
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ Mètrica                   ┃ Valor       ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ Petició                   │ GET /dishes │
+│ Clients actius / inactius │ 30 / 3      │
+│ Respostes correctes (2xx) │ 30 / 30     │
+│ Temps total               │ 0.417 s     │
+│ Latència mitjana          │ 240.5 ms    │
+│ Latència màxima           │ 413.6 ms    │
+└───────────────────────────┴─────────────┘
+
+## B) PostgreSQL (Docker, configuració per defecte de .env, SERVER_PORT=8099)
+$ python client/load_test_client.py --port 8099 --clients 30
+  Prova de càrrega — CONCURRENT (gather)   
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ Mètrica                   ┃ Valor       ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ Petició                   │ GET /dishes │
+│ Clients actius / inactius │ 30 / 0      │
+│ Respostes correctes (2xx) │ 30 / 30     │
+│ Temps total               │ 0.448 s     │
+│ Latència mitjana          │ 271.5 ms    │
+│ Latència màxima           │ 443.7 ms    │
+└───────────────────────────┴─────────────┘
+$ python client/load_test_client.py --port 8099 --clients 30 --sequential
+ Prova de càrrega — SEQÜENCIAL (un darrere 
+                 l'altre)                  
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ Mètrica                   ┃ Valor       ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ Petició                   │ GET /dishes │
+│ Clients actius / inactius │ 30 / 0      │
+│ Respostes correctes (2xx) │ 30 / 30     │
+│ Temps total               │ 0.684 s     │
+│ Latència mitjana          │ 22.8 ms     │
+│ Latència màxima           │ 27.6 ms     │
+└───────────────────────────┴─────────────┘
+
+# Interpretació (mesures repetides 3 vegades, resultats estables):
+# - SQLite:     concurrent ~0,41 s  vs  seqüencial ~0,29-0,36 s  -> la concurrència NO hi guanya.
+#   SQLite és una llibreria dins del mateix procés: les consultes són CPU (amb el GIL agafat),
+#   no esperen cap socket. No hi ha esperes per solapar i to_thread + Semaphore només afegeixen cost.
+# - PostgreSQL: concurrent ~0,45 s  vs  seqüencial ~0,69 s  -> la concurrència guanya (~1,5x).
+#   Cada consulta espera la resposta de PostgreSQL per xarxa; mentre un fil espera, els altres avancen.
+# - El benefici de la concurrència apareix quan hi ha ESPERES (xarxa, BD, clients lents):
+#   vegeu 03_p1_vs_p2.txt (client inactiu) i 02_experiment_db.txt (BD lenta).

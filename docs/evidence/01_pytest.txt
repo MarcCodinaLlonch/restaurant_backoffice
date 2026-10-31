@@ -1,0 +1,59 @@
+$ pytest -v
+======================================= test session starts ========================================
+platform linux -- Python 3.14.4, pytest-9.0.3, pluggy-1.6.0 -- /home/marcc/Projectes/restaurant_backoffice/.venv/bin/python
+rootdir: /home/marcc/Projectes/restaurant_backoffice
+configfile: pyproject.toml
+testpaths: tests
+plugins: asyncio-1.4.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collecting ... collected 47 items
+
+tests/test_async_request_reader.py::test_read_request_get_without_body PASSED                [  2%]
+tests/test_async_request_reader.py::test_read_request_post_with_json_body PASSED             [  4%]
+tests/test_async_request_reader.py::test_read_request_clean_eof_returns_none PASSED          [  6%]
+tests/test_async_request_reader.py::test_read_request_incomplete_headers_raises_protocol_error PASSED [  8%]
+tests/test_async_request_reader.py::test_read_request_body_exceeds_max_limit PASSED          [ 10%]
+tests/test_async_request_reader.py::test_read_request_invalid_content_length PASSED          [ 12%]
+tests/test_async_request_reader.py::test_response_builder_new_status_codes PASSED            [ 14%]
+tests/test_async_server.py::test_twenty_clients_are_served_concurrently PASSED               [ 17%]
+tests/test_async_server.py::test_idle_client_does_not_block_others PASSED                    [ 19%]
+tests/test_async_server.py::test_blocking_database_does_not_freeze_the_server PASSED         [ 21%]
+tests/test_async_server.py::test_client_disconnecting_mid_request_does_not_stop_server PASSED [ 23%]
+tests/test_async_server.py::test_unexpected_error_only_affects_that_client PASSED            [ 25%]
+tests/test_async_server.py::test_read_timeout_returns_408 PASSED                             [ 27%]
+tests/test_async_server.py::test_malformed_request_returns_400 PASSED                        [ 29%]
+tests/test_async_server.py::test_body_too_large_returns_413 PASSED                           [ 31%]
+tests/test_async_server.py::test_too_many_connections_returns_503 PASSED                     [ 34%]
+tests/test_async_server.py::test_interactive_sync_client_works_unchanged PASSED              [ 36%]
+tests/test_async_server.py::test_encode_and_decode_are_consistent PASSED                     [ 38%]
+tests/test_request_parser.py::test_parse_head_get_request PASSED                             [ 40%]
+tests/test_request_parser.py::test_parse_head_extracts_query_parameters PASSED               [ 42%]
+tests/test_request_parser.py::test_parse_body_json PASSED                                    [ 44%]
+tests/test_request_parser.py::test_parse_body_empty_returns_none PASSED                      [ 46%]
+tests/test_request_parser.py::test_parse_head_invalid_raises_protocol_error[] PASSED         [ 48%]
+tests/test_request_parser.py::test_parse_head_invalid_raises_protocol_error[\r\n\r\n] PASSED [ 51%]
+tests/test_request_parser.py::test_parse_head_invalid_raises_protocol_error[HELLO\r\n\r\n] PASSED [ 53%]
+tests/test_response_builder.py::test_build_ok_response PASSED                                [ 55%]
+tests/test_response_builder.py::test_build_created_response PASSED                           [ 57%]
+tests/test_response_builder.py::test_build_no_content_response PASSED                        [ 59%]
+tests/test_response_builder.py::test_build_bad_request_response PASSED                       [ 61%]
+tests/test_response_builder.py::test_build_not_found_response PASSED                         [ 63%]
+tests/test_response_builder.py::test_serialize_domain_entities PASSED                        [ 65%]
+tests/test_router.py::test_router_get_categories PASSED                                      [ 68%]
+tests/test_router.py::test_router_post_categories PASSED                                     [ 70%]
+tests/test_router.py::test_router_handles_value_error_as_bad_request PASSED                  [ 72%]
+tests/test_router.py::test_router_unknown_route_returns_404 PASSED                           [ 74%]
+tests/test_router.py::test_router_get_missing_category_returns_404 PASSED                    [ 76%]
+tests/test_router.py::test_router_delete_category_returns_204 PASSED                         [ 78%]
+tests/test_router.py::test_router_add_allergen_to_dish PASSED                                [ 80%]
+tests/test_router.py::test_router_unexpected_service_error_returns_500 PASSED                [ 82%]
+tests/test_services.py::test_category_service_create_empty_name_raises_error PASSED          [ 85%]
+tests/test_services.py::test_category_service_create_valid PASSED                            [ 87%]
+tests/test_services.py::test_employee_service_creates_credentials_with_sha256 PASSED         [ 89%]
+tests/test_services.py::test_dish_service_create_category_not_found PASSED                   [ 91%]
+tests/test_services.py::test_menu_service_filter_price_validation PASSED                     [ 93%]
+tests/test_services.py::test_sale_service_create_negative_quantity PASSED                    [ 95%]
+tests/test_services.py::test_allergen_service_create_empty_name_raises_error PASSED          [ 97%]
+tests/test_services.py::test_category_service_delete_missing_returns_false PASSED            [100%]
+
+======================================== 47 passed in 1.18s ========================================
