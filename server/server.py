@@ -1,12 +1,18 @@
 """
-server.py: Punt d'entrada del servidor TCP asíncron per a Restaurant BackOffice.
+server.py: Punt d'entrada del servidor asíncron (asyncio) de Restaurant BackOffice.
+
+Mateixa estructura que l'exemple de classe:
+    server = await asyncio.start_server(handle_client, host, port)
+    async with server:
+        await server.serve_forever()
 """
+
 import asyncio
 import logging
 import os
 import sys
 
-# Assegurem que l'arrel del projecte és la primera ruta de sys.path
+# Afegim l'arrel del projecte al sys.path per poder importar el paquet 'server'.
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 if current_dir in sys.path:
@@ -14,19 +20,18 @@ if current_dir in sys.path:
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from server.src import bootstrap
-from server.src.network import AsyncTcpServer, ClientConnectionHandler, RequestDispatcher
-from server.src.persistence.config import (
+from server.src.bootstrap import create_router, create_uow_factory  # noqa: E402
+from server.src.network import ClientConnectionHandler, RequestDispatcher  # noqa: E402
+from server.src.persistence.config import (  # noqa: E402
+    DB_MAX_CONCURRENCY,
     DB_URL,
-    SERVER_HOST,
-    SERVER_PORT,
-    READ_TIMEOUT_SECONDS,
     MAX_BODY_SIZE,
     MAX_CONNECTIONS,
-    DB_MAX_CONCURRENCY,
+    READ_TIMEOUT_SECONDS,
+    SERVER_HOST,
+    SERVER_PORT,
 )
 
-# Configuració de logging professional (reemplaça els antics print)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -36,38 +41,35 @@ logger = logging.getLogger("server")
 
 
 async def main() -> None:
-    banner = r"""
-  ==============================================================
-   RESTAURANT BACKOFFICE — SERVIDOR ASÍNCRON TCP (AsyncIO)
-   Arquitectura: Una Task concurrent per client (Non-blocking I/O)
-  ==============================================================
-    """
-    print(banner)
+    # 1. Persistència i negoci (codi de la Pràctica 1, sense canvis).
+    uow_factory = create_uow_factory(DB_URL)
+    router = create_router(uow_factory)
 
-    # 1. Inicialitzem la base de dades
-    bootstrap.init_database(DB_URL)
-
-    # 2. Creem l'enrutador amb tots els serveis i el despatxador fora de l'Event Loop
-    router = bootstrap.create_router(DB_URL)
+    # 2. Capa de xarxa asíncrona (nou a la Pràctica 2).
     dispatcher = RequestDispatcher(router, max_concurrent_calls=DB_MAX_CONCURRENCY)
-
-    # 3. Creem el controlador de connexions amb límits i timeouts de seguretat
     handler = ClientConnectionHandler(
         dispatcher=dispatcher,
-        max_body_size=MAX_BODY_SIZE,
         read_timeout=READ_TIMEOUT_SECONDS,
+        max_body_size=MAX_BODY_SIZE,
         max_connections=MAX_CONNECTIONS,
     )
+    server = await asyncio.start_server(handler.handle_client, SERVER_HOST, SERVER_PORT)
+    logger.info("Listening on %s:%s (Ctrl+C to stop)", SERVER_HOST, SERVER_PORT)
 
-    # 4. Instanciem el servidor asíncron amb suport per a Graceful Shutdown
-    server = AsyncTcpServer(SERVER_HOST, SERVER_PORT, handler)
-
-    # 5. Comencem a escoltar peticions indefinidament
-    await server.serve_forever()
+    try:
+        # 'async with' garanteix que el socket d'escolta es tanca en sortir.
+        async with server:
+            await server.serve_forever()
+    finally:
+        # Graceful shutdown: tanquem les connexions del pool de la BD.
+        uow_factory.engine.dispose()
+        logger.info("Server stopped, resources released")
 
 
 if __name__ == "__main__":
+    if not DB_URL:
+        sys.exit("Error: no database URL configured (check the .env file).")
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Servidor aturat per l'usuari (Ctrl+C).")
+        pass  # Ctrl+C: el 'finally' de main() ja ha fet la neteja.
