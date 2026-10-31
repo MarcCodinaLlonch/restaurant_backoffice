@@ -29,9 +29,9 @@ async def read_request(
         if not exc.partial:
             # EOF net: el client s'ha desconnectat sense demanar res
             return None
-        raise ProtocolError("Capcaleres HTTP incompletes.") from exc
+        raise ProtocolError("Capçaleres HTTP incompletes.") from exc
     except asyncio.LimitOverrunError as exc:
-        raise ProtocolError("Capcaleres HTTP massa grans.") from exc
+        raise ProtocolError("Capçaleres HTTP massa grans.") from exc
 
     request = RequestParser.parse_head(head)
 
@@ -41,11 +41,11 @@ async def read_request(
         if content_length < 0:
             raise ValueError()
     except ValueError:
-        raise ProtocolError(f"Content-Length invalid: {raw_content_length}")
+        raise ProtocolError(f"Content-Length invàlid: {raw_content_length}")
 
     if content_length > max_body_size:
         raise PayloadTooLargeError(
-            f"El cos ({content_length} bytes) supera el limit permès ({max_body_size} bytes)."
+            f"El cos ({content_length} bytes) supera el límit permès ({max_body_size} bytes)."
         )
 
     if content_length > 0:
@@ -53,7 +53,8 @@ async def read_request(
             raw_body = await reader.readexactly(content_length)
         except asyncio.IncompleteReadError as exc:
             raise ProtocolError(
-                f"Connexio tancada abans de rebre tot el cos ({len(exc.partial)}/{content_length} bytes)."
+                f"Connexió tancada abans de rebre tot el cos "
+                f"({len(exc.partial)}/{content_length} bytes)."
             ) from exc
 
         content_type = request.headers.get("content-type", "")

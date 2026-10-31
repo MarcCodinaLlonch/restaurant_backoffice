@@ -1,4 +1,7 @@
-# request_parser.py: Parser per analitzar les peticions HTTP sobre un socket TCP o StreamReader.
+# request_parser.py: Converteix bytes HTTP en un objecte HttpRequest.
+#
+# CONCEPTE: funcions PURES (no fan I/O). Reben bytes i retornen objectes.
+# Qui llegeix del socket és async_request_reader.py; aquí només interpretem.
 import json
 from dataclasses import dataclass, field
 from typing import Any
@@ -37,11 +40,11 @@ class RequestParser:
         raw_text = head_bytes.decode("utf-8", errors="replace")
         lines = raw_text.split("\r\n")
         if not lines or not lines[0].strip():
-            raise ProtocolError("Peticio HTTP buida.")
+            raise ProtocolError("Petició HTTP buida.")
 
         first_line_parts = lines[0].strip().split()
         if len(first_line_parts) < 2:
-            raise ProtocolError(f"Linia de peticio mal formada: {lines[0]}")
+            raise ProtocolError(f"Línia de petició mal formada: {lines[0]}")
 
         method = first_line_parts[0].upper()
         path = first_line_parts[1]
@@ -82,83 +85,3 @@ class RequestParser:
             except json.JSONDecodeError:
                 return text
         return text
-
-    @staticmethod
-    def parse_bytes(data: bytes) -> HttpRequest | None:
-        """
-        Mètode auxiliar pur (útil per a tests): rep els bytes sencers d'una petició
-        i reutilitza parse_head i parse_body.
-        """
-        if not data:
-            return None
-
-        if b"\r\n\r\n" in data:
-            head_part, body_part = data.split(b"\r\n\r\n", 1)
-        else:
-            head_part, body_part = data, b""
-
-        try:
-            request = RequestParser.parse_head(head_part)
-        except ProtocolError:
-            return None
-
-        content_length = int(request.headers.get("content-length", "0"))
-        if content_length > 0 and body_part:
-            body_bytes = body_part[:content_length]
-            request.body = RequestParser.parse_body(
-                body_bytes, request.headers.get("content-type", "")
-            )
-        return request
-
-    @staticmethod
-    def parse_from_socket(client_socket, timeout: float = 5.0) -> HttpRequest | None:
-        """
-        Llegeix pas a pas d'un socket síncron reutilitzant parse_head i parse_body.
-        (Manté retrocompatibilitat amb la P1).
-        """
-        client_socket.settimeout(timeout)
-        buffer = bytearray()
-
-        while b"\r\n\r\n" not in buffer:
-            chunk = client_socket.recv(1024)
-            if not chunk:
-                if not buffer:
-                    return None
-                break
-            buffer.extend(chunk)
-
-        if not buffer:
-            return None
-
-        header_end = buffer.find(b"\r\n\r\n")
-        if header_end == -1:
-            head_bytes = bytes(buffer)
-            remaining_body = b""
-        else:
-            head_bytes = bytes(buffer[:header_end])
-            remaining_body = bytes(buffer[header_end + 4 :])
-
-        try:
-            request = RequestParser.parse_head(head_bytes)
-        except ProtocolError:
-            return None
-
-        try:
-            content_length = int(request.headers.get("content-length", "0"))
-        except ValueError:
-            return None
-
-        if content_length > 0:
-            body_bytes = bytearray(remaining_body)
-            while len(body_bytes) < content_length:
-                chunk = client_socket.recv(min(1024, content_length - len(body_bytes)))
-                if not chunk:
-                    break
-                body_bytes.extend(chunk)
-
-            request.body = RequestParser.parse_body(
-                bytes(body_bytes[:content_length]),
-                request.headers.get("content-type", ""),
-            )
-
-        return request
