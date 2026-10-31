@@ -2,7 +2,7 @@
 
 > 🌐 **Language:** **English (PROTOCOL_ENG.md)** | [Català (PROTOCOL_CAT.md)](PROTOCOL_CAT.md)
 
-## Restaurant BackOffice — Version 2.0.0
+## Restaurant BackOffice — Version 3.0.0 (AsyncIO Multi-Client)
 
 This document defines the complete technical specification of the application-level communication protocol established between the **Client** and the **Server** of the restaurant management system.
 
@@ -10,19 +10,15 @@ This document defines the complete technical specification of the application-le
 
 ## 1. Overview and Theoretical Foundations
 
-The protocol is inspired by **HTTP/1.1 REST**, implemented directly on top of the **TCP (Transmission Control Protocol)** transport layer using blocking sockets provided by Python's standard `socket` library.
+The protocol is inspired by **HTTP/1.1 REST**, implemented directly on top of the **TCP (Transmission Control Protocol)** transport layer using an asynchronous non-blocking concurrent server powered by Python's standard `asyncio` library.
 
-### Why not Python's Pickle?
-While Python's native `pickle` module allows straightforward object serialization, it introduces critical security vulnerabilities (arbitrary remote code execution when unpickling untrusted inputs) and couples both ends strictly to Python runtimes and specific class versions.
-
-### Adopted Solution:
-1. **Plain-Text Encoding with UTF-8:** Human-readable messages and universal interoperability across diverse programming languages and platforms.
-2. **JSON Serialization:** All payloads and domain models are serialized as standard JSON objects.
-3. **Stream Framing and Message Delimitation:**
-   - Every header line terminates with standard CRLF (`\r\n`).
-   - The end of the header section is explicitly marked by an empty line (`\r\n\r\n`).
-   - When a message carries a body (in POST or PUT requests, or responses), the `Content-Length` header indicates the exact byte size to read from the socket.
-4. **Stateless Connection Model:** Each request is atomic and independent. The client connects over TCP, sends the formatted request, awaits the response, and the connection is closed (`Connection: close`).
+### Asynchronous Concurrency and Transport (v3.0.0):
+1. **Non-blocking Model:** The server processes multiple simultaneous client connections over a single CPU thread via Python's Event Loop and `asyncio.start_server`.
+2. **One Task per Client:** Each client runs inside an isolated coroutine task; idle or slow clients do not block or degrade performance for others.
+3. **Safe Stream Framing:**
+   - `readuntil(b"\r\n\r\n")` for asynchronous header extraction.
+   - `readexactly(content_length)` for deterministic body reception according to the `Content-Length` header.
+4. **Stateless Connection Model:** Each request is atomic and independent (`Connection: close`).
 
 ---
 
@@ -74,8 +70,10 @@ Content-Length: 38\r\n
 | **204** | No Content | Action executed successfully (e.g., DELETE). Returns no response body. |
 | **400** | Bad Request | Client validation failure (e.g., empty name, negative price, duplicate unique key). |
 | **404** | Not Found | Requested resource ID does not exist or route is unrecognized. |
+| **408** | Request Timeout | Client exceeded `READ_TIMEOUT_SECONDS` (5s) before sending a complete HTTP request. |
+| **413** | Payload Too Large | Request payload body exceeds the configured limit `MAX_BODY_SIZE` (1 MB). |
 | **500** | Internal Server Error | Unhandled server exception during request processing. |
-| **503** | Service Unavailable | Returned by client when the TCP server is unreachable. |
+| **503** | Service Unavailable | Server at maximum concurrent capacity (`MAX_CONNECTIONS` reached) or unreachable. |
 
 In the event of an error (4xx or 5xx), the response body consistently returns a JSON object with an `"error"` key:
 ```json

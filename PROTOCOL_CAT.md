@@ -2,7 +2,7 @@
 
 > 🌐 **Idioma:** [English (PROTOCOL_ENG.md)](PROTOCOL_ENG.md) | **Català (PROTOCOL_CAT.md)**
 
-## Restaurant BackOffice — Versió 2.0.0
+## Restaurant BackOffice — Versió 3.0.0 (AsyncIO Multi-Client)
 
 Aquest document descriu l'especificació completa del protocol d'aplicació utilitzat per a la comunicació entre el **Client** i el **Servidor** del sistema de gestió de restaurants.
 
@@ -10,19 +10,15 @@ Aquest document descriu l'especificació completa del protocol d'aplicació util
 
 ## 1. Visió General i Fonaments Teòrics
 
-El protocol està inspirat en **HTTP/1.1 REST** implementat directament sobre la capa de transport **TCP (Transmission Control Protocol)** mitjançant sockets bloquejants en Python.
+El protocol està inspirat en **HTTP/1.1 REST** implementat directament sobre la capa de transport **TCP (Transmission Control Protocol)** mitjançant un servidor asíncron concurrent amb **AsyncIO** en Python.
 
-### Per què no utilitzar Pickle de Python?
-Pickle permet serialitzar objectes natius de Python fàcilment, però presenta greus problemes de seguretat (execució remota de codi maliciós en deserialitzar dades no confiables) i genera un acoblament estricte entre les versions i llenguatges del client i del servidor.
-
-### Solució adoptada:
-1. **Format de text amb codificació UTF-8**: Missatges llegibles per humans i interoperables amb qualsevol tecnologia o llenguatge futur.
-2. **Serialització de dades en JSON**: Totes les càrregues útils (payloads) viatgen en format JSON estàndard.
-3. **Delimitació de missatges**:
-   - Cada línia de capçalera finalitza amb la seqüència estàndard CRLF (`\r\n`).
-   - El final de les capçaleres es determina amb una línia buida (`\r\n\r\n`).
-   - Si la petició o la resposta conté un cos (body), la capçalera `Content-Length` indica exactament quants bytes s'han de llegir del socket.
-4. **Model Stateless (Sense estat)**: Cada petició és atòmica i independent. El client obre una connexió TCP, envia la petició, rep la resposta i es tanca la connexió (`Connection: close`).
+### Concurrència Asíncrona i Transport (Novetat v3.0.0):
+1. **Model no bloquejant**: El servidor atén múltiples clients simultanis sobre un sol fil de CPU utilitzant l'Event Loop de Python i `asyncio.start_server`.
+2. **Una Task per client**: Cada connexió és aïllada; un client lent o inactiu mai no bloqueja les peticions dels altres.
+3. **Framing TCP segur**:
+   - `readuntil(b"\r\n\r\n")` per a la lectura asíncrona de capçaleres.
+   - `readexactly(content_length)` per a la lectura exacta del cos segons la capçalera `Content-Length`.
+4. **Model Stateless (Sense estat)**: Cada petició és atòmica i independent (`Connection: close`).
 
 ---
 
@@ -74,8 +70,10 @@ Content-Length: 38\r\n
 | **204** | No Content | Operació realitzada amb èxit (ex: DELETE). No retorna cos. |
 | **400** | Bad Request | Dades invàlides enviades pel client (nom buit, preu negatiu, format incorrecte). |
 | **404** | Not Found | El recurs sol·licitat no existeix a la base de dades o la ruta és desconeguda. |
+| **408** | Request Timeout | El client ha trigat més de `READ_TIMEOUT_SECONDS` (5s) a transmetre la petició. |
+| **413** | Payload Too Large | El cos de la petició supera el límit configurat `MAX_BODY_SIZE` (1 MB). |
 | **500** | Internal Server Error | Error inesperat durant l'execució al servidor. |
-| **503** | Service Unavailable | Retornat pel client quan el servidor TCP no és accessible. |
+| **503** | Service Unavailable | Servidor saturat (`MAX_CONNECTIONS` assolit) o no accessible. |
 
 En cas d'error (4xx o 5xx), el cos de la resposta sempre conté un objecte JSON amb la clau `"error"`:
 ```json
