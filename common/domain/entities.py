@@ -2,18 +2,20 @@
 #
 # CONCEPTE CLAU PER A DAM (Clean Domain / Domini Net):
 # Aquestes classes representen la informació del nostre negoci (plats, empleats, categories...)
-# de forma 100% independent de qualsevol tecnologia de persistència (com SQLAlchemy o SQLite/PostgreSQL).
+# de forma 100% independent de qualsevol tecnologia de persistència
+# (com SQLAlchemy o SQLite/PostgreSQL).
 #
 # Per què ho fem així?
 # 1. Independència: El client mai ha d'importar 'sqlalchemy' ni dependre de la base de dades.
 # 2. Reutilització: El mateix fitxer d'entitats pot viure a la carpeta 'common/' i ser
-#    utilitzat tant pel Servidor (per crear respostes) com pel Client (per rebre dades i pintar a la UI).
+#    utilitzat tant pel Servidor (per crear respostes) com pel Client
+#    (per rebre dades i pintar a la UI).
 # 3. Serialització fàcil: Cada classe té mètodes 'to_dict()' i 'from_dict()' per convertir
 #    les dades a diccionari Python -> JSON -> bytes per viatjar pel socket TCP.
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
+
 
 # Entitat de domini: Classe pura de python que representa concepte clau de negoci -> Categories
 # Completament independent de la base de dades
@@ -24,6 +26,7 @@ class CategoryEntity:
     Entitat de domini que representa una Categoria de plats.
     Només conté les dades pròpies de la categoria, sense dependència d'SQLAlchemy.
     """
+
     id: Optional[int] = None
     category_name: str = ""
     last_update: Optional[str] = None
@@ -40,7 +43,8 @@ class CategoryEntity:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "CategoryEntity":
         """Crea una instància de CategoryEntity a partir d'un diccionari (deserialització JSON)."""
-        # S'utilitza quan rebem JSON del servidor (resp.data), el passem a diccionari, i volem "reconstruir" objecte en Python.
+        # S'utilitza quan rebem JSON del servidor (resp.data), el passem a diccionari,
+        # i volem "reconstruir" l'objecte en Python.
         return cls(
             id=data.get("id"),
             category_name=data.get("category_name", ""),
@@ -59,6 +63,7 @@ class AllergenEntity:
     """
     Entitat de domini per als Al·lèrgens (ex: Gluten, Lactosa, Fruits secs).
     """
+
     id: Optional[int] = None
     allergen_name: str = ""
     last_update: Optional[str] = None
@@ -91,6 +96,7 @@ class DishEntity:
     Entitat de domini per a un Plat.
     Inclou les dades de la seva categoria (1:N) i la llista dels seus al·lèrgens (N:M).
     """
+
     id: Optional[int] = None
     dish_name: str = ""
     description: Optional[str] = None
@@ -108,7 +114,7 @@ class DishEntity:
             "is_active": self.is_active,
             "id_category": self.id_category,
             "category_name": self.category_name,
-            "allergens": [a.to_dict() for a in self.allergens],
+            "allergens": [allergen.to_dict() for allergen in self.allergens],
             "last_update": self.last_update,
         }
 
@@ -116,8 +122,8 @@ class DishEntity:
     def from_dict(cls, data: Dict[str, Any]) -> "DishEntity":
         raw_allergens = data.get("allergens", [])
         allergens = [
-            AllergenEntity.from_dict(a) if isinstance(a, dict) else a
-            for a in raw_allergens
+            AllergenEntity.from_dict(allergen) if isinstance(allergen, dict) else allergen
+            for allergen in raw_allergens
         ]
         return cls(
             id=data.get("id"),
@@ -144,6 +150,7 @@ class EmployeeEntity:
     Per motius de seguretat, mai viatja el hash de contrasenya cap al client.
     Només indiquem si té credencials creades (relació 1:1) i el seu email.
     """
+
     id: Optional[int] = None
     name: str = ""
     surname: str = ""
@@ -191,6 +198,7 @@ class MenuEntity:
     Entitat de domini per a un Menú.
     Té un preu i una llista de plats associats (relació N:M a través de menu_dish).
     """
+
     id: Optional[int] = None
     menu_name: str = ""
     price: float = 0.0
@@ -202,7 +210,7 @@ class MenuEntity:
             "id": self.id,
             "menu_name": self.menu_name,
             "price": float(self.price),
-            "dishes": [d.to_dict() for d in self.dishes],
+            "dishes": [dish.to_dict() for dish in self.dishes],
             "last_update": self.last_update,
         }
 
@@ -210,8 +218,7 @@ class MenuEntity:
     def from_dict(cls, data: Dict[str, Any]) -> "MenuEntity":
         raw_dishes = data.get("dishes", [])
         dishes = [
-            DishEntity.from_dict(d) if isinstance(d, dict) else d
-            for d in raw_dishes
+            DishEntity.from_dict(dish) if isinstance(dish, dict) else dish for dish in raw_dishes
         ]
         return cls(
             id=data.get("id"),
@@ -234,6 +241,7 @@ class SaleEntity:
     Entitat de domini per a una Venda (N:M amb atributs).
     Clau primària composta per (id_menu, id_employee, sale_date).
     """
+
     id_menu: int = 0
     id_employee: int = 0
     sale_date: str = ""  # Format ISO: 'YYYY-MM-DD'
@@ -269,4 +277,7 @@ class SaleEntity:
         return f"SaleEntity(menu={self.id_menu}, emp={self.id_employee}, date='{self.sale_date}')"
 
     def __str__(self) -> str:
-        return f"Venda {self.sale_date}: Menú #{self.id_menu} venut per Empleat #{self.id_employee} (x{self.quantity_sold})"
+        return (
+            f"Venda {self.sale_date}: Menú #{self.id_menu} "
+            f"venut per Empleat #{self.id_employee} (x{self.quantity_sold})"
+        )

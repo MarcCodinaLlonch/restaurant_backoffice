@@ -3,11 +3,17 @@
 # Si hi ha un error a mig camí, es fa rollback() automàticament.
 
 from abc import ABC, abstractmethod
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
+
 from .repositories import (
-    EmployeeRepository, MenuRepository, DishRepository,
-    SaleRepository, CategoryRepository, AllergenRepository
+    AllergenRepository,
+    CategoryRepository,
+    DishRepository,
+    EmployeeRepository,
+    MenuRepository,
+    SaleRepository,
 )
 
 

@@ -9,7 +9,8 @@ import os
 import sys
 
 # Assegurem que l'arrel del projecte és la primera ruta de sys.path
-# i eliminem el directori 'client' de sys.path perquè Python no confongui el fitxer 'client.py' amb el paquet 'client'
+# i eliminem el directori 'client' de sys.path perquè Python no confongui
+# el fitxer 'client.py' amb el paquet 'client'
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 if current_dir in sys.path:
@@ -17,17 +18,17 @@ if current_dir in sys.path:
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich import box
+from rich import box  # noqa: E402
+from rich.console import Console  # noqa: E402
+from rich.panel import Panel  # noqa: E402
+from rich.text import Text  # noqa: E402
 
-from client.src.protocol.http_client import HttpClient
-from client.src.ui import (
-    menu_categories,
-    menu_employees,
+from client.src.protocol.http_client import HttpClient  # noqa: E402
+from client.src.ui import (  # noqa: E402
     menu_allergens,
+    menu_categories,
     menu_dishes,
+    menu_employees,
     menu_menus,
     menu_sales,
 )
@@ -54,9 +55,10 @@ def main_menu(client: HttpClient):
 
         console.print(
             Panel.fit(
-                f"[bold blue]Restaurant BackOffice (Client TCP) — Servidor: {client.host}:{client.port}[/bold blue]",
+                f"[bold blue]Restaurant BackOffice (Client TCP) — "
+                f"Servidor: {client.host}:{client.port}[/bold blue]",
                 border_style="blue",
-                box=box.DOUBLE
+                box=box.DOUBLE,
             )
         )
         console.print("1. Gestió d'Empleats")
@@ -67,21 +69,21 @@ def main_menu(client: HttpClient):
         console.print("6. Gestió de Vendes")
         console.print("0. Sortir")
 
-        opcio = console.input("\n[bold yellow]Selecciona una opció:[/bold yellow] ")
+        option = console.input("\n[bold yellow]Selecciona una opció:[/bold yellow] ")
 
-        if opcio == "1":
+        if option == "1":
             menu_employees(client)
-        elif opcio == "2":
+        elif option == "2":
             menu_categories(client)
-        elif opcio == "3":
+        elif option == "3":
             menu_dishes(client)
-        elif opcio == "4":
+        elif option == "4":
             menu_allergens(client)
-        elif opcio == "5":
+        elif option == "5":
             menu_menus(client)
-        elif opcio == "6":
+        elif option == "6":
             menu_sales(client)
-        elif opcio == "0":
+        elif option == "0":
             console.print("[green]Fins aviat![/green]")
             break
         else:

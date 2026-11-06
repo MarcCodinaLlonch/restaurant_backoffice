@@ -1,16 +1,18 @@
-# test_services.py: Proves unitàries de la capa de serveis utilitzant Mocks per aïllar la base de dades.
+# test_services.py: Proves unitàries de la capa de serveis.
+# Fem servir Mocks per aïllar la base de dades.
 
 import hashlib
 from datetime import date
 from unittest.mock import MagicMock
+
 import pytest
 
+from server.src.services.allergen_service import AllergenService
 from server.src.services.category_service import CategoryService
-from server.src.services.employee_service import EmployeeService
 from server.src.services.dish_service import DishService
+from server.src.services.employee_service import EmployeeService
 from server.src.services.menu_service import MenuService
 from server.src.services.sale_service import SaleService
-from server.src.persistence.models import Category, Employee, Dish, Menu, Sale
 
 
 @pytest.fixture
@@ -54,7 +56,7 @@ def test_employee_service_creates_credentials_with_sha256(mock_uow_factory):
         national_id="12345678A",
         role="Cambrer",
         email="marc@restaurant.com",
-        password="secretpassword"
+        password="secretpassword",
     )
 
     assert emp.name == "Marc"
@@ -91,3 +93,18 @@ def test_sale_service_create_negative_quantity(mock_uow_factory):
 
     with pytest.raises(ValueError, match="La quantitat venuda ha de ser superior a 0"):
         service.create(id_menu=1, id_employee=1, sale_date_val=date.today(), quantity_sold=-2)
+
+
+def test_allergen_service_create_empty_name_raises_error(mock_uow_factory):
+    """No es permet crear un al·lèrgen sense nom."""
+    factory, _ = mock_uow_factory
+    with pytest.raises(ValueError):
+        AllergenService(factory).create("   ")
+
+
+def test_category_service_delete_missing_returns_false(mock_uow_factory):
+    """Esborrar una categoria inexistent retorna False (el Router ho converteix en 404)."""
+    factory, uow = mock_uow_factory
+    uow.categories.get.return_value = None
+    assert CategoryService(factory).delete(42) is False
+    uow.categories.delete.assert_not_called()

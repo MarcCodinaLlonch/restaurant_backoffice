@@ -1,0 +1,33 @@
+# Demo 1: P1 (sockets bloquejants, tag v2.0.0) vs P2 (asyncio)
+# Mateix client de càrrega: 5 clients actius + 1 client inactiu (connecta i no envia res durant 3 s)
+# Configuració: ENVIRONMENT=test DB_URL_TESTS=sqlite:///demo.db SERVER_PORT=8099
+
+## a) Servidor P1 (cd ../p1_server && python server/server.py)
+$ python client/load_test_client.py --port 8099 --clients 5 --idle-clients 1
+  Prova de càrrega — CONCURRENT (gather)   
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ Mètrica                   ┃ Valor       ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ Petició                   │ GET /dishes │
+│ Clients actius / inactius │ 5 / 1       │
+│ Respostes correctes (2xx) │ 5 / 5       │
+│ Temps total               │ 3.127 s     │
+│ Latència mitjana          │ 3041.8 ms   │
+│ Latència màxima           │ 3126.5 ms   │
+└───────────────────────────┴─────────────┘
+
+## b) Servidor P2 (python server/server.py)
+$ python client/load_test_client.py --port 8099 --clients 5 --idle-clients 1
+  Prova de càrrega — CONCURRENT (gather)   
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ Mètrica                   ┃ Valor       ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ Petició                   │ GET /dishes │
+│ Clients actius / inactius │ 5 / 1       │
+│ Respostes correctes (2xx) │ 5 / 5       │
+│ Temps total               │ 0.092 s     │
+│ Latència mitjana          │ 80.6 ms     │
+│ Latència màxima           │ 91.4 ms     │
+└───────────────────────────┴─────────────┘
+
+# Conclusió: P1 = 3,13 s (bloquejat a recv() pel client inactiu); P2 = 0,09 s (una Task per client).

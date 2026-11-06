@@ -1,8 +1,8 @@
 # __init__.py a common/domain
 # Permet importar directament les entitats des de common.domain
 from .entities import (
-    CategoryEntity,
     AllergenEntity,
+    CategoryEntity,
     DishEntity,
     EmployeeEntity,
     MenuEntity,

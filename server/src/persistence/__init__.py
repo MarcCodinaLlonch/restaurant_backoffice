@@ -1,14 +1,14 @@
 # __init__.py a server/src/persistence
 from .config import DB_URL, SERVER_HOST, SERVER_PORT
-from .db import Base, engine, Session
-from .models import Employee, AppCredential, Category, Dish, Allergen, Menu, Sale
+from .db import Base
+from .models import Allergen, AppCredential, Category, Dish, Employee, Menu, Sale
 from .repositories import (
-    Repository,
-    CategoryRepository,
     AllergenRepository,
+    CategoryRepository,
     DishRepository,
     EmployeeRepository,
     MenuRepository,
+    Repository,
     SaleRepository,
 )
 from .unit_of_work import AbstractUnitOfWork, SqlAlchemyUnitOfWork, UnitOfWorkFactory
@@ -18,8 +18,6 @@ __all__ = [
     "SERVER_HOST",
     "SERVER_PORT",
     "Base",
-    "engine",
-    "Session",
     "Employee",
     "AppCredential",
     "Category",

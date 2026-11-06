@@ -1,108 +1,110 @@
 # mappers.py: Tradueix entre els models ORM de SQLAlchemy i les Entitats de Domini netes.
 #
 # CONCEPTE CLAU PER A DAM (Mappers / Object-to-Entity Mapping):
-# La persistència de la base de dades utilitza objectes 'Category', 'Employee' lligats a SQLAlchemy.
-# Però el servei i el protocol només han de retornar objectes purs ('CategoryEntity', 'EmployeeEntity').
+# La persistència de la base de dades utilitza objectes 'Category', 'Employee'
+# lligats a SQLAlchemy. Però el servei i el protocol només han de retornar
+# objectes purs ('CategoryEntity', 'EmployeeEntity').
 # Aquest fitxer conté funcions auxiliars per fer aquesta traducció neta i centralitzada.
 
 from common.domain.entities import (
-    CategoryEntity,
     AllergenEntity,
+    CategoryEntity,
     DishEntity,
     EmployeeEntity,
     MenuEntity,
     SaleEntity,
 )
-from .models import Category, Allergen, Dish, Employee, Menu, Sale
+
+from .models import Allergen, Category, Dish, Employee, Menu, Sale
 
 
-def category_to_entity(cat: Category) -> CategoryEntity:
+def category_to_entity(category: Category) -> CategoryEntity:
     """Converteix un model ORM Category a CategoryEntity."""
-    if not cat:
+    if not category:
         return None
     return CategoryEntity(
-        id=cat.id,
-        category_name=cat.category_name,
-        last_update=cat.last_update.isoformat() if cat.last_update else None,
+        id=category.id,
+        category_name=category.category_name,
+        last_update=category.last_update.isoformat() if category.last_update else None,
     )
 
 
-def allergen_to_entity(al: Allergen) -> AllergenEntity:
+def allergen_to_entity(allergen: Allergen) -> AllergenEntity:
     """Converteix un model ORM Allergen a AllergenEntity."""
-    if not al:
+    if not allergen:
         return None
     return AllergenEntity(
-        id=al.id,
-        allergen_name=al.allergen_name,
-        last_update=al.last_update.isoformat() if al.last_update else None,
+        id=allergen.id,
+        allergen_name=allergen.allergen_name,
+        last_update=allergen.last_update.isoformat() if allergen.last_update else None,
     )
 
 
-def dish_to_entity(d: Dish) -> DishEntity:
+def dish_to_entity(dish: Dish) -> DishEntity:
     """Converteix un model ORM Dish a DishEntity, incloent categoria i al·lèrgens."""
-    if not d:
+    if not dish:
         return None
-    allergens_entities = [allergen_to_entity(a) for a in (d.allergens or [])]
-    cat_name = d.category.category_name if d.category else None
+    allergens_entities = [allergen_to_entity(allergen) for allergen in (dish.allergens or [])]
+    category_name = dish.category.category_name if dish.category else None
     return DishEntity(
-        id=d.id,
-        dish_name=d.dish_name,
-        description=d.description,
-        is_active=bool(d.is_active),
-        id_category=d.id_category,
-        category_name=cat_name,
+        id=dish.id,
+        dish_name=dish.dish_name,
+        description=dish.description,
+        is_active=bool(dish.is_active),
+        id_category=dish.id_category,
+        category_name=category_name,
         allergens=allergens_entities,
-        last_update=d.last_update.isoformat() if d.last_update else None,
+        last_update=dish.last_update.isoformat() if dish.last_update else None,
     )
 
 
-def employee_to_entity(emp: Employee) -> EmployeeEntity:
+def employee_to_entity(employee: Employee) -> EmployeeEntity:
     """
     Converteix un model ORM Employee a EmployeeEntity.
     Nota de seguretat: No exportem mai el hash de la contrasenya cap a l'entitat.
     """
-    if not emp:
+    if not employee:
         return None
-    has_creds = emp.credentials is not None
-    email = emp.credentials.email if emp.credentials else None
+    has_credentials = employee.credentials is not None
+    email = employee.credentials.email if employee.credentials else None
     return EmployeeEntity(
-        id=emp.id,
-        name=emp.name,
-        surname=emp.surname,
-        national_id=emp.national_id,
-        role=emp.role,
-        has_credentials=has_creds,
+        id=employee.id,
+        name=employee.name,
+        surname=employee.surname,
+        national_id=employee.national_id,
+        role=employee.role,
+        has_credentials=has_credentials,
         email=email,
-        last_update=emp.last_update.isoformat() if emp.last_update else None,
+        last_update=employee.last_update.isoformat() if employee.last_update else None,
     )
 
 
-def menu_to_entity(m: Menu) -> MenuEntity:
+def menu_to_entity(menu: Menu) -> MenuEntity:
     """Converteix un model ORM Menu a MenuEntity, incloent els seus plats associats."""
-    if not m:
+    if not menu:
         return None
-    dishes_entities = [dish_to_entity(d) for d in (m.dishes or [])]
+    dishes_entities = [dish_to_entity(dish) for dish in (menu.dishes or [])]
     return MenuEntity(
-        id=m.id,
-        menu_name=m.menu_name,
-        price=float(m.price),
+        id=menu.id,
+        menu_name=menu.menu_name,
+        price=float(menu.price),
         dishes=dishes_entities,
-        last_update=m.last_update.isoformat() if m.last_update else None,
+        last_update=menu.last_update.isoformat() if menu.last_update else None,
     )
 
 
-def sale_to_entity(s: Sale) -> SaleEntity:
+def sale_to_entity(sale: Sale) -> SaleEntity:
     """Converteix un model ORM Sale a SaleEntity."""
-    if not s:
+    if not sale:
         return None
-    menu_name = s.menu.menu_name if s.menu else None
-    emp_name = f"{s.employee.name} {s.employee.surname}" if s.employee else None
+    menu_name = sale.menu.menu_name if sale.menu else None
+    employee_name = f"{sale.employee.name} {sale.employee.surname}" if sale.employee else None
     return SaleEntity(
-        id_menu=s.id_menu,
-        id_employee=s.id_employee,
-        sale_date=str(s.sale_date),
-        quantity_sold=s.quantity_sold,
+        id_menu=sale.id_menu,
+        id_employee=sale.id_employee,
+        sale_date=str(sale.sale_date),
+        quantity_sold=sale.quantity_sold,
         menu_name=menu_name,
-        employee_name=emp_name,
-        last_update=s.last_update.isoformat() if s.last_update else None,
+        employee_name=employee_name,
+        last_update=sale.last_update.isoformat() if sale.last_update else None,
     )
