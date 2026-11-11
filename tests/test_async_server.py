@@ -12,20 +12,16 @@ import time
 import pytest
 
 from client.src.protocol.http_client import HttpClient, decode_response, encode_request
-from server.src.network import ClientConnectionHandler, RequestDispatcher
+from server.src.network import ClientConnectionHandler
 from server.src.protocol.response_builder import ResponseBuilder
 
 HOST = "127.0.0.1"
 
 
 class FakeRouter:
-    """Substitueix el Router real. `delay` simula una consulta lenta (bloquejant) a la BD."""
-
-    def __init__(self, delay: float = 0.0) -> None:
-        self.delay = delay
+    """Substitueix el Router real (síncron, com el de debò) per no dependre de PostgreSQL."""
 
     def handle_request(self, request) -> bytes:
-        time.sleep(self.delay)  # Bloquejant a propòsit, com psycopg2.
         if request.raw_path == "/categories":
             return ResponseBuilder.ok([{"id": 1, "category_name": "Begudes"}])
         if request.raw_path == "/crash":
@@ -33,17 +29,9 @@ class FakeRouter:
         return ResponseBuilder.not_found("Route not found")
 
 
-async def start_test_server(
-    delay: float = 0.0, max_connections: int = 50, read_timeout: float = 0.5
-) -> tuple[asyncio.Server, int]:
+async def start_test_server() -> tuple[asyncio.Server, int]:
     """Arrenca un servidor de prova i retorna (servidor, port)."""
-    dispatcher = RequestDispatcher(FakeRouter(delay), max_concurrent_calls=10)
-    handler = ClientConnectionHandler(
-        dispatcher=dispatcher,
-        read_timeout=read_timeout,
-        max_body_size=500,
-        max_connections=max_connections,
-    )
+    handler = ClientConnectionHandler(router=FakeRouter(), read_timeout=0.5, max_body_size=500)
     server = await asyncio.start_server(handler.handle_client, HOST, 0)
     port = server.sockets[0].getsockname()[1]
     return server, port
@@ -88,17 +76,6 @@ async def test_idle_client_does_not_block_others(server_port: int):
     await idle_writer.wait_closed()
 
 
-async def test_blocking_database_does_not_freeze_the_server():
-    """5 peticions de 0,3 s: si la BD bloquegés el loop trigarien 1,5 s; amb to_thread ~0,3 s."""
-    server, port = await start_test_server(delay=0.3)
-    async with server:
-        start = time.perf_counter()
-        statuses = await asyncio.gather(*(get(port, "/categories") for _ in range(5)))
-        elapsed = time.perf_counter() - start
-    assert statuses == [200] * 5
-    assert elapsed < 0.8
-
-
 async def test_client_disconnecting_mid_request_does_not_stop_server(server_port: int):
     _, writer = await asyncio.open_connection(HOST, server_port)
     writer.write(b'POST /categories HTTP/1.1\r\nContent-Length: 50\r\n\r\n{"incompl')
@@ -132,21 +109,10 @@ async def test_body_too_large_returns_413(server_port: int):
     assert decode_response(await send_raw(server_port, request)).status_code == 413
 
 
-async def test_too_many_connections_returns_503():
-    server, port = await start_test_server(max_connections=2, read_timeout=1.0)
-    async with server:
-        idle_writers = [(await asyncio.open_connection(HOST, port))[1] for _ in range(2)]
-        reader, writer = await asyncio.open_connection(HOST, port)
-        response = decode_response(await reader.read())
-        for w in [*idle_writers, writer]:
-            w.close()
-            await w.wait_closed()
-    assert response.status_code == 503
-
-
 async def test_interactive_sync_client_works_unchanged(server_port: int):
     """El HttpClient de la P1 (sockets bloquejants) funciona igual: el protocol no ha canviat.
-    El cridem amb to_thread perquè és bloquejant i no volem aturar l'event loop del test."""
+    És un client bloquejant: el cridem amb to_thread perquè no aturi l'event loop del TEST,
+    que és el mateix on corre el servidor de prova. (El servidor real no fa servir fils.)"""
     client = HttpClient(host=HOST, port=server_port, timeout=2.0)
     response = await asyncio.to_thread(client.get, "/categories")
     assert response.is_success

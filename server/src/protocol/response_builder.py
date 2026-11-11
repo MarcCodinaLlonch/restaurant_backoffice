@@ -93,10 +93,3 @@ class ResponseBuilder:
     def payload_too_large(message: str = "Cos de la petició massa gran") -> bytes:
         """413 Payload Too Large: El body de la petició supera el límit permès."""
         return ResponseBuilder.build(413, "Payload Too Large", {"error": message})
-
-    @staticmethod
-    def service_unavailable(
-        message: str = "Servei no disponible temporalment",
-    ) -> bytes:
-        """503 Service Unavailable: El servidor ha assolit el límit màxim de connexions."""
-        return ResponseBuilder.build(503, "Service Unavailable", {"error": message})

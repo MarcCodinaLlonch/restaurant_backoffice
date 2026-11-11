@@ -52,7 +52,7 @@ def decode_response(raw_bytes: bytes) -> ApiResponse:
     """
     Funció pura que converteix els bytes bruts d'una resposta HTTP en un ApiResponse.
     """
-    #mirall del servidor: separa per línia buida (\r\n\r\n), llegeix codi i fa json.loads.
+    # mirall del servidor: separa per línia buida (\r\n\r\n), llegeix codi i fa json.loads.
     if not raw_bytes:
         return ApiResponse(
             status_code=500,
@@ -109,11 +109,11 @@ class HttpClient:
         try:
             sock.connect((self.host, self.port))
             full_request_bytes = encode_request(method, path, self.host, self.port, body)
-            #sendall insisteix fins transmetre tots els bytes (a diferència de send).
+            # sendall insisteix fins transmetre tots els bytes (a diferència de send).
             sock.sendall(full_request_bytes)
 
             response_buffer = bytearray()
-            #bucle recv llegeix fins a b"" perquè el servidor tanca el socket en acabar.
+            # bucle recv llegeix fins a b"" perquè el servidor tanca el socket en acabar.
             while True:
                 chunk = sock.recv(2048)
                 if not chunk:
@@ -145,7 +145,7 @@ class HttpClient:
         finally:
             sock.close()
 
-    #dreceres HTTP; cadascuna fa l'anada (sendall) i la tornada (recv + decode_response).
+    # dreceres HTTP; cadascuna fa l'anada (sendall) i la tornada (recv + decode_response).
     def get(self, path: str) -> ApiResponse:
         """Envia una petició GET al servidor."""
         return self._send_request("GET", path)

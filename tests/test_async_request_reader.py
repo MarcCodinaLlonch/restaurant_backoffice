@@ -97,6 +97,3 @@ def test_response_builder_new_status_codes():
 
     resp_413 = ResponseBuilder.payload_too_large()
     assert b"HTTP/1.1 413 Payload Too Large" in resp_413
-
-    resp_503 = ResponseBuilder.service_unavailable()
-    assert b"HTTP/1.1 503 Service Unavailable" in resp_503

@@ -41,7 +41,7 @@ class Router:
         """
         Punt d'entrada que processa una petició i retorna els bytes de la resposta HTTP.
         """
-        # CLAU: s'executa al fil secundari (to_thread); d'aquí cap avall no hi ha cap await.
+        # CLAU: codi síncron cridat des de l'event loop; d'aquí cap avall no hi ha cap await.
         if not request:
             return ResponseBuilder.bad_request("Petició invàlida o incompleta.")
 

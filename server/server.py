@@ -16,12 +16,10 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from server.src.bootstrap import create_router, create_uow_factory  # noqa: E402
-from server.src.network import ClientConnectionHandler, RequestDispatcher  # noqa: E402
+from server.src.network import ClientConnectionHandler  # noqa: E402
 from server.src.persistence.config import (  # noqa: E402
-    DB_MAX_CONCURRENCY,
     DB_URL,
     MAX_BODY_SIZE,
-    MAX_CONNECTIONS,
     READ_TIMEOUT_SECONDS,
     SERVER_HOST,
     SERVER_PORT,
@@ -41,12 +39,10 @@ async def main() -> None:
     router = create_router(uow_factory)
 
     # 2. Capa de xarxa asíncrona (nou a la Pràctica 2).
-    dispatcher = RequestDispatcher(router, max_concurrent_calls=DB_MAX_CONCURRENCY)
     handler = ClientConnectionHandler(
-        dispatcher=dispatcher,
+        router=router,
         read_timeout=READ_TIMEOUT_SECONDS,
         max_body_size=MAX_BODY_SIZE,
-        max_connections=MAX_CONNECTIONS,
     )
     # CLAU: handle_client va sense parèntesis; asyncio la crida en una Task nova per client.
     server = await asyncio.start_server(handler.handle_client, SERVER_HOST, SERVER_PORT)

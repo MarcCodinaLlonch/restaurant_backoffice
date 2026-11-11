@@ -7,8 +7,7 @@ import logging
 from server.src.protocol.async_request_reader import read_request
 from server.src.protocol.errors import PayloadTooLargeError, ProtocolError
 from server.src.protocol.response_builder import ResponseBuilder
-
-from .request_dispatcher import RequestDispatcher
+from server.src.protocol.router import Router
 
 logger = logging.getLogger(__name__)
 
@@ -18,17 +17,13 @@ class ClientConnectionHandler:
 
     def __init__(
         self,
-        dispatcher: RequestDispatcher,
+        router: Router,
         read_timeout: float,
         max_body_size: int,
-        max_connections: int,
     ) -> None:
-        self._dispatcher = dispatcher
+        self._router = router
         self._read_timeout = read_timeout
         self._max_body_size = max_body_size
-        self._max_connections = max_connections
-        # Comptador simple. No cal Lock: només el toca el fil de l'event loop.
-        self._active_connections = 0
 
     async def handle_client(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -37,8 +32,7 @@ class ClientConnectionHandler:
         # CLAU: reader ("l'orella") i writer ("la boca") per connexió; 1 connexió = 1 petició
         # (stateless).
         client_address = writer.get_extra_info("peername")
-        self._active_connections += 1
-        logger.info("Client connected: %s (active: %d)", client_address, self._active_connections)
+        logger.info("Client connected: %s", client_address)
         try:
             # CLAU: mentre espera la resposta, la Task es pausa i l'event loop atén altres clients.
             response = await self._build_response(reader, client_address)
@@ -55,24 +49,15 @@ class ClientConnectionHandler:
             logger.exception("Unexpected error with client %s", client_address)
         finally:
             # Passi el que passi, alliberem el socket (evitem fuites de recursos).
-            self._active_connections -= 1
             writer.close()
             with contextlib.suppress(ConnectionError):
                 await writer.wait_closed()
-            logger.info(
-                "Connection closed: %s (active: %d)",
-                client_address,
-                self._active_connections,
-            )
+            logger.info("Connection closed: %s", client_address)
 
     async def _build_response(
         self, reader: asyncio.StreamReader, client_address: object
     ) -> bytes | None:
         """Decideix QUÈ hem de respondre. Retorna None si el client ja no espera res."""
-        # CLAU: comprovem el límit de connexions ABANS de llegir res per rebutjar ràpid (503).
-        if self._active_connections > self._max_connections:
-            return ResponseBuilder.service_unavailable("Server busy, try again later.")
-
         try:
             # Si el client no envia la petició sencera a temps -> 408.
             # CLAU: el cronòmetre engloba TOTA la lectura (capçaleres + cos)
@@ -96,5 +81,6 @@ class ClientConnectionHandler:
             return None
 
         logger.info("%s %s from %s", request.method, request.raw_path, client_address)
-        # CLAU: la Task es pausa mentre el fil secundari del dispatcher fa la feina de la BD.
-        return await self._dispatcher.dispatch(request)
+        # CLAU: el Router (i la BD) és síncron i es crida directament, sense await.
+        # Les consultes duren pocs ms: mentrestant les altres Tasks esperen el seu torn.
+        return self._router.handle_request(request)
