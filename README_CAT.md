@@ -4,7 +4,7 @@
 [![SQLAlchemy](https://img.shields.io/badge/ORM-SQLAlchemy-red.svg)](https://www.sqlalchemy.org/)
 [![asyncio](https://img.shields.io/badge/Network-asyncio-orange.svg)](https://docs.python.org/3/library/asyncio.html)
 [![Rich](https://img.shields.io/badge/CLI-Rich-blueviolet.svg)](https://rich.readthedocs.io/)
-[![Tests](https://img.shields.io/badge/Tests-49%20passing-brightgreen.svg)](https://docs.pytest.org/)
+[![Tests](https://img.shields.io/badge/Tests-47%20passing-brightgreen.svg)](https://docs.pytest.org/)
 [![Ruff](https://img.shields.io/badge/PEP%208-ruff-black.svg)](https://docs.astral.sh/ruff/)
 
 > 🌐 **Idioma:** [English (README.md)](README.md) | **Català (README_CAT.md)**
@@ -17,8 +17,8 @@
 
 Aquesta versió implementa:
 - **Servidor asíncron multiclient**: `asyncio.start_server` crea **una Task per client**, i totes s'executen en un sol fil (l'event loop). Un client lent o inactiu no bloqueja mai els altres.
-- **La BD bloquejant, fora de l'event loop**: SQLAlchemy + psycopg2 s'executen en fils (`asyncio.to_thread`), limitats per un `asyncio.Semaphore`.
-- **Robustesa**: timeout de lectura (408), mida màxima del cos (413), màxim de connexions (503), gestió neta de desconnexions sobtades i aturada neta amb Ctrl+C.
+- **BD síncrona, impacte analitzat**: SQLAlchemy + psycopg2 es criden directament des de l'event loop (consultes de pocs ms). L'impacte està mesurat a docs/DB_ACCESS_ANALYSIS_CAT.md.
+- **Robustesa**: timeout de lectura (408), mida màxima del cos (413), gestió neta de desconnexions sobtades i aturada neta amb Ctrl+C.
 - **Protocol i capa de negoci sense canvis**: el protocol HTTP/1.1 + JSON, els serveis, el Router i la persistència de la Pràctica 1 es reutilitzen tal com eren.
 - **Tests automàtics**: serveis, router, serialització/deserialització del protocol i escenaris multiclient reals sobre TCP.
 
@@ -114,7 +114,7 @@ python client/load_test_client.py --clients 20 --idle-clients 3   # més 3 clien
 ```bash
 python experiments/01_await_vs_task.py          # dos await seguits NO són concurrents; gather sí
 python experiments/02_blocking_call.py          # una crida bloquejant congela l'event loop
-python experiments/03_blocking_vs_offloaded.py  # BD bloquejant inline vs to_thread (no cal PostgreSQL)
+python experiments/03_blocking_db_impact.py  # impacte de la BD síncrona: consultes de 2 ms vs 200 ms (no cal PostgreSQL)
 ```
 
 ---
@@ -124,14 +124,14 @@ python experiments/03_blocking_vs_offloaded.py  # BD bloquejant inline vs to_thr
 ```bash
 pytest -v
 ```
-Passen els **49 tests** (no necessiten PostgreSQL):
+Passen els **47 tests** (no necessiten PostgreSQL):
 
 | Àrea | Fitxers de tests |
 |---|---|
 | Serveis | `test_services.py` |
 | Router | `test_router.py` |
 | Serialització / deserialització del protocol | `test_request_parser.py`, `test_response_builder.py`, `test_async_request_reader.py` |
-| Multiclient i robustesa | `test_async_server.py` (20 clients alhora, client inactiu, BD lenta, desconnexió, error inesperat, 408, 400, 413, 503, client de la P1) |
+| Multiclient i robustesa | `test_async_server.py` (20 clients alhora, client inactiu, desconnexió, error inesperat, 408, 400, 413, client de la P1) |
 
 Comprovació de PEP 8:
 ```bash

@@ -110,8 +110,7 @@ restaurant_backoffice/
 │   └── src/
 │       ├── bootstrap.py             # Wires persistence -> services -> router
 │       ├── network/                 # ASYNCIO NETWORK LAYER (v3.0)
-│       │   ├── connection_handler.py # One Task per client: read -> process -> respond -> close
-│       │   └── request_dispatcher.py # Runs the Router in a thread (to_thread + Semaphore)
+│       │   └── connection_handler.py # One Task per client: read -> process -> respond -> close
 │       ├── persistence/             # PERSISTENCE LAYER (SERVER ONLY)
 │       │   ├── config.py            # Database and network configuration
 │       │   ├── db.py                # SQLAlchemy declarative Base (the engine lives in UnitOfWorkFactory)

@@ -31,7 +31,7 @@ Pickle permet serialitzar objectes natius de Python fàcilment, però presenta g
 - El servidor fa servir `asyncio.start_server`: **una Task per connexió**, totes en un sol fil (l'event loop). Un client lent o inactiu no bloqueja mai els altres.
 - **Una petició per connexió:** el servidor llegeix una petició, envia una resposta i tanca el socket.
 - *Framing* al servidor: `reader.readuntil(b"\r\n\r\n")` per a les capçaleres i `reader.readexactly(content_length)` per al cos.
-- L'accés a la BD (SQLAlchemy + psycopg2, bloquejants) s'executa en fils amb `asyncio.to_thread`, limitat per un `asyncio.Semaphore`, de manera que l'event loop no es queda mai aturat.
+- L'accés a la BD (SQLAlchemy + psycopg2) és síncron i es crida directament des de l'event loop; les consultes duren pocs mil·lisegons (anàlisi a docs/DB_ACCESS_ANALYSIS_CAT.md).
 
 ### 1.2 Límits i timeouts
 
@@ -39,16 +39,13 @@ Pickle permet serialitzar objectes natius de Python fàcilment, però presenta g
 | :--- | :--- | :--- |
 | `READ_TIMEOUT_SECONDS` | 5 s | **408** Request Timeout |
 | `MAX_BODY_SIZE` | 1 MB | **413** Payload Too Large |
-| `MAX_CONNECTIONS` | 50 | **503** Service Unavailable |
-| `DB_MAX_CONCURRENCY` | 5 (= `pool_size` de SQLAlchemy) | La petició espera torn al semàfor (sense bloquejar l'event loop) |
 
 ### 1.3 Cicle de vida d'una connexió
 1. El client obre una connexió TCP; `asyncio.start_server` crea una Task nova que executa `handle_client`.
-2. Si hi ha massa connexions actives, el servidor respon **503** de seguida.
-3. El servidor llegeix la petició amb un timeout (**408** si no arriba a temps, **413** si el cos és massa gran, **400** si està mal formada).
-4. La petició s'envia al Router en un fil secundari.
-5. S'escriu la resposta (`write` + `await drain()`).
-6. El socket es tanca **sempre** (`finally: close()` + `await wait_closed()`), fins i tot si hi ha hagut errors. Un error inesperat només afecta la Task d'aquell client.
+2. El servidor llegeix la petició amb un timeout (**408** si no arriba a temps, **413** si el cos és massa gran, **400** si està mal formada).
+3. La petició s'envia al Router, que es crida directament (síncron).
+4. S'escriu la resposta (`write` + `await drain()`).
+5. El socket es tanca **sempre** (`finally: close()` + `await wait_closed()`), fins i tot si hi ha hagut errors. Un error inesperat només afecta la Task d'aquell client.
 
 ---
 
@@ -103,7 +100,7 @@ Content-Length: 38\r\n
 | **408** | Request Timeout | El genera el servidor: el client no ha enviat la petició completa en `READ_TIMEOUT_SECONDS` (5 s). |
 | **413** | Payload Too Large | El genera el servidor: el `Content-Length` supera `MAX_BODY_SIZE` (1 MB). |
 | **500** | Internal Server Error | Error inesperat durant l'execució al servidor. |
-| **503** | Service Unavailable | El genera el servidor quan s'arriba a `MAX_CONNECTIONS`. També el genera **el client** quan no pot connectar amb el servidor. |
+| **503** | Service Unavailable | El genera **el client** quan no pot connectar amb el servidor. |
 
 En cas d'error (4xx o 5xx), el cos de la resposta sempre conté un objecte JSON amb la clau `"error"`:
 ```json

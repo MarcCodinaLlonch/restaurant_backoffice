@@ -47,7 +47,7 @@ Quan ja no necessitis la còpia de la P1: `git worktree remove ../p1_server`.
 | 2 | `python client/client.py` → Gestió de Plats → Llistar |
 | 3 | `python client/client.py` → Gestió de Categories → Afegir |
 
-Al log del terminal 1 es veuen les connexions de tots dos clients, amb adreces i ports diferents, i el comptador `active: N`.
+Al log del terminal 1 es veuen les connexions de tots dos clients, amb adreces i ports diferents.
 Per veure-ho de manera més clara, mentre els clients treballen, obre un 4t terminal amb un client mut:
 ```bash
 python -c "import socket,time; s=socket.create_connection(('127.0.0.1',8088)); time.sleep(10)"
@@ -61,21 +61,21 @@ python client/load_test_client.py --clients 30
 python client/load_test_client.py --clients 30 --sequential
 python client/load_test_client.py --clients 30 --idle-clients 3
 ```
-Amb consultes ràpides en local, la diferència entre el mode concurrent i el seqüencial és petita. **El benefici de la concurrència apareix quan hi ha esperes** (clients lents o una BD lenta): ho demostren la demo 1 i la demo 4.
+Amb consultes ràpides en local, la diferència entre el mode concurrent i el seqüencial és petita. **El benefici de la concurrència apareix amb esperes de xarxa** (clients lents o inactius, demo 1 i `--idle-clients`).
 
 Mesures reals (`docs/evidence/04_load_concurrent_vs_sequential.txt`):
 
 | BD | Concurrent | Seqüencial | Per què |
 |---|---|---|---|
-| PostgreSQL | ~0,45 s | ~0,69 s | Cada consulta espera la xarxa: mentre un fil espera, els altres avancen |
-| SQLite | ~0,41 s | ~0,29-0,36 s | SQLite és dins del procés (CPU + GIL): no hi ha esperes per solapar i els fils només afegeixen cost |
+| PostgreSQL | ~0,28 s | ~0,28 s | La BD és síncrona i les consultes van una darrere l'altra; el benefici de la concurrència apareix amb esperes de xarxa (clients lents o inactius) |
+| SQLite | ~0,14 s | ~0,16 s | La BD és síncrona i en memòria/fitxer local; les consultes van una darrere l'altra i duren pocs ms |
 
-## Demo 4: Impacte d'una BD bloquejant (no necessita Docker)
+## Demo 4: Impacte de la BD síncrona (no necessita Docker)
 
 ```bash
-python experiments/03_blocking_vs_offloaded.py
+python experiments/03_blocking_db_impact.py
 ```
-10 clients, cada consulta tarda 0,2 s: **inline ≈ 2 s** (en fila) vs **to_thread ≈ 0,2-0,4 s** (solapades).
+10 clients: consultes de 2 ms ≈ 0,03 s (no es nota); consultes de 200 ms ≈ 2 s (en fila).
 
 ## Demo 5: Robustesa i aturada neta
 
@@ -88,7 +88,7 @@ python experiments/03_blocking_vs_offloaded.py
 ```bash
 pytest -v
 ```
-`tests/test_async_server.py` arrenca un servidor real i hi connecta clients TCP reals: 20 clients alhora, un client mut, una BD lenta, una desconnexió a mitja petició, un error inesperat, i els codis 408/400/413/503. `tests/test_persistence.py` prova la persistència real amb SQLite (l'id dels creates).
+`tests/test_async_server.py` arrenca un servidor real i hi connecta clients TCP reals: 20 clients alhora, un client mut, una desconnexió a mitja petició, un error inesperat, i els codis 408/400/413. `tests/test_persistence.py` prova la persistència real amb SQLite (l'id dels creates).
 
 ## Proves desades
 

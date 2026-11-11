@@ -111,8 +111,7 @@ restaurant_backoffice/
 │   └── src/
 │       ├── bootstrap.py             # Connecta persistència -> serveis -> router
 │       ├── network/                 # CAPA DE XARXA ASYNCIO (v3.0)
-│       │   ├── connection_handler.py # Una Task per client: llegir -> processar -> respondre -> tancar
-│       │   └── request_dispatcher.py # Executa el Router en un fil (to_thread + Semaphore)
+│       │   └── connection_handler.py # Una Task per client: llegir -> processar -> respondre -> tancar
 │       ├── persistence/             # PERSISTÈNCIA (NOMÉS SERVIDOR)
 │       │   ├── config.py            # Configuració de BD i ports
 │       │   ├── db.py                # Base declarativa de SQLAlchemy (l'engine és a UnitOfWorkFactory)

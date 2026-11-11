@@ -6,7 +6,7 @@
 
 - **Practice 1:** TCP server with blocking sockets. Handled **one client at a time**: while waiting for `recv()`, other clients queued up.
 - **Practice 2:** Server with `asyncio.start_server`. Each client has **its own Task** and all share **a single thread** (the event loop). When a Task executes `await`, it yields control to the others.
-- The database (SQLAlchemy + psycopg2) is **blocking**, so it is executed in **threads** (`asyncio.to_thread`) bounded by an `asyncio.Semaphore`. This ensures the event loop never stalls.
+- The database (SQLAlchemy + psycopg2) is **synchronous** and the Router is called **directly** from the event loop: queries take a few milliseconds. The impact is analysed in [DB_ACCESS_ANALYSIS_ENG.md](DB_ACCESS_ANALYSIS_ENG.md).
 - The protocol, business logic, and persistence layers from Practice 1 are reused **without changes**.
 
 ## 2. Layer Diagram
@@ -15,43 +15,41 @@
 
 ```mermaid
 flowchart TD
-    subgraph CLIENTS["Clients (N concurrently)"]
+    subgraph CLIENTS["Clients (N at once)"]
         C1["client.py (interactive menu)"]
         C2["load_test_client.py (N clients with gather)"]
     end
 
-    subgraph NET["Network Layer - asyncio (NEW in P2)"]
+    subgraph NET["Network layer - asyncio (NEW in P2)"]
         SS["asyncio.start_server (server.py)"]
         CH["ClientConnectionHandler.handle_client (1 Task per client)"]
         RR["read_request (StreamReader)"]
-        RD["RequestDispatcher (to_thread + Semaphore)"]
     end
 
-    subgraph PROTO["Protocol Layer (P1)"]
+    subgraph PROTO["Protocol layer (P1)"]
         RP["RequestParser"]
         RT["Router"]
         RB["ResponseBuilder"]
     end
 
-    subgraph BUS["Business Layer (P1)"]
+    subgraph BUS["Business layer (P1)"]
         SV["Services (Category, Dish, Menu...)"]
     end
 
-    subgraph PERS["Persistence Layer (P1)"]
+    subgraph PERS["Persistence layer (P1)"]
         UOW["UnitOfWork + Repositories"]
         DB[("PostgreSQL")]
     end
 
     C1 -- "TCP: HTTP/1.1 + JSON" --> SS
     C2 -- "TCP: HTTP/1.1 + JSON" --> SS
-    SS -- "creates Task" --> CH
+    SS -- "creates a Task" --> CH
     CH -- "await" --> RR
     RR --> RP
-    CH -- "await" --> RD
-    RD -- "ThreadPool worker thread" --> RT
+    CH -- "direct call (synchronous)" --> RT
     RT --> SV
     SV --> UOW
-    UOW -- "Blocking SQL" --> DB
+    UOW -- "synchronous SQL (a few ms)" --> DB
     RT --> RB
 ```
 
@@ -65,25 +63,20 @@ sequenceDiagram
     participant A as Client A
     participant B as Client B
     participant EL as Event loop (1 thread)
-    participant TP as ThreadPool Worker
     participant DB as PostgreSQL
 
-    A->>EL: connects (start_server spawns Task A)
-    B->>EL: connects (start_server spawns Task B)
-    A->>EL: GET /dishes
-    Note over EL: Task A: await read_request()
-    EL->>TP: Task A: await to_thread(router.handle_request)
-    TP->>DB: SELECT ... (blocks ONLY this worker thread)
+    A->>EL: connects (start_server creates Task A)
+    B->>EL: connects (start_server creates Task B)
+    Note over EL: Task A: await read_request() (waits for the network, the loop is free)
     B->>EL: GET /categories
-    Note over EL: Event loop is free and serves Task B
-    EL->>TP: Task B: await to_thread(router.handle_request)
-    TP->>DB: SELECT ...
-    DB-->>TP: dish rows
-    TP-->>EL: HTTP 200 bytes
-    EL-->>A: write() + await drain(), close()
-    DB-->>TP: category rows
-    TP-->>EL: HTTP 200 bytes
+    Note over EL: Task B: request complete
+    EL->>DB: Task B: router.handle_request() (synchronous, a few ms)
+    DB-->>EL: category rows
     EL-->>B: write() + await drain(), close()
+    A->>EL: GET /dishes (arrives later)
+    EL->>DB: Task A: router.handle_request() (synchronous, a few ms)
+    DB-->>EL: dish rows
+    EL-->>A: write() + await drain(), close()
 ```
 
 ## 4. Before vs After
@@ -110,11 +103,10 @@ flowchart LR
 |---|---|
 | `server/server.py` | Assembles components and starts `asyncio.start_server` (`async with server` + `serve_forever`) |
 | `server/src/network/connection_handler.py` | Lifecycle of ONE connection: read → process → reply → close |
-| `server/src/network/request_dispatcher.py` | Offloads blocking DB calls from the event loop using `to_thread` + `Semaphore` |
 | `server/src/protocol/async_request_reader.py` | `read_request()`: reads an HTTP request from `StreamReader` (headers + `Content-Length`) |
 | `server/src/protocol/request_parser.py` | `RequestParser`: pure parsing functions, bytes → `HttpRequest` |
 | `server/src/protocol/router.py` | `Router`: routes requests to matching services by method and path (P1 code) |
-| `server/src/protocol/response_builder.py` | `ResponseBuilder`: constructs HTTP response bytes (200, 404, 408, 413, 503...) |
+| `server/src/protocol/response_builder.py` | `ResponseBuilder`: constructs HTTP response bytes (200, 400, 404, 408, 413...) |
 | `server/src/services/` | Business logic and validations (P1 code, unmodified) |
 | `server/src/persistence/` | ORM models, repositories, Unit of Work, and the single SQLAlchemy engine |
 | `server/src/bootstrap.py` | Layer wiring: persistence → services → router |
@@ -124,11 +116,10 @@ flowchart LR
 Stateless protocol: **1 connection = 1 request**.
 
 1. The client connects and `asyncio.start_server` spawns a **new Task** running `handle_client(reader, writer)`.
-2. If active connections exceed the allowed limit, an immediate **503** is returned.
-3. `read_request()` reads the request bounded by `asyncio.timeout(READ_TIMEOUT_SECONDS)`.
-4. `dispatcher.dispatch(request)` acquires a semaphore slot and runs the Router via `asyncio.to_thread`.
-5. `writer.write(response)` + `await writer.drain()` (*backpressure*).
-6. `finally`: `writer.close()` + `await writer.wait_closed()`. The socket is **always closed**, even upon errors.
+2. `read_request()` reads the request bounded by `asyncio.timeout(READ_TIMEOUT_SECONDS)`.
+3. `router.handle_request(request)` is called directly (synchronous): Router → Services → DB, a few milliseconds.
+4. `writer.write(response)` + `await writer.drain()` (*backpressure*).
+5. `finally`: `writer.close()` + `await writer.wait_closed()`. The socket is **always closed**, even upon errors.
 
 An unhandled error only crashes that specific client Task; the server keeps running and serving other clients.
 
@@ -136,8 +127,6 @@ An unhandled error only crashes that specific client Task; the server keeps runn
 |---|---|---|
 | `READ_TIMEOUT_SECONDS` | 5 s | **408** Request Timeout |
 | `MAX_BODY_SIZE` | 1 MB | **413** Payload Too Large |
-| `MAX_CONNECTIONS` | 50 | **503** Service Unavailable |
-| `DB_MAX_CONCURRENCY` | 5 (= SQLAlchemy `pool_size`) | Request waits for a `Semaphore` slot (without blocking the loop) |
 
 ## 7. Graceful Shutdown
 

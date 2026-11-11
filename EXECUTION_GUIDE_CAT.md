@@ -41,8 +41,8 @@ pytest -v
 ```
 
 **Què veuràs:**
-Un llistat verd amb **49 tests superats (100% PASSED)** en un segon aproximadament:
-- Escenaris multiclient reals contra el servidor asyncio (20 clients alhora, client inactiu, BD lenta, 408/400/413/503).
+Un llistat verd amb **47 tests superats (100% PASSED)** en un segon aproximadament:
+- Escenaris multiclient reals contra el servidor asyncio (20 clients alhora, client inactiu, 408/400/413).
 - Parsing i construcció de peticions/respostes HTTP.
 - Lògica de negoci de tots els serveis amb Mocks.
 - Control d'errors i rutes 404 del Router.

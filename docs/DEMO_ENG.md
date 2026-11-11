@@ -47,7 +47,7 @@ When done with the P1 copy: `git worktree remove ../p1_server`.
 | 2 | `python client/client.py` → Dish Management → List All |
 | 3 | `python client/client.py` → Category Management → Add New |
 
-Terminal 1's server logs will display both connections simultaneously, with independent remote ports and the active counter `active: N`.
+Terminal 1's server logs will display both connections simultaneously, with independent remote ports.
 To see this even more clearly, while clients are working, open a 4th terminal with a silent client:
 ```bash
 python -c "import socket,time; s=socket.create_connection(('127.0.0.1',8088)); time.sleep(10)"
@@ -61,21 +61,21 @@ python client/load_test_client.py --clients 30
 python client/load_test_client.py --clients 30 --sequential
 python client/load_test_client.py --clients 30 --idle-clients 3
 ```
-With fast local queries, latency differences between concurrent and sequential modes are small. **The real benefit of concurrency emerges when wait times exist** (slow clients or slow DB I/O), as demonstrated by Demo 1 and Demo 4.
+With fast local queries, latency differences between concurrent and sequential modes are small. **The benefit of concurrency appears with network waits** (slow or idle clients, Demo 1 and `--idle-clients`).
 
 Measured benchmark data (`docs/evidence/04_load_concurrent_vs_sequential.txt`):
 
 | Database | Concurrent | Sequential | Explanation |
 |---|---|---|---|
-| PostgreSQL | ~0.45 s | ~0.69 s | Each query waits on network I/O: while one worker thread waits, others proceed |
-| SQLite | ~0.41 s | ~0.29–0.36 s | SQLite runs in-process (CPU + GIL): no I/O wait to overlap, threads add overhead |
+| PostgreSQL | ~0.28 s | ~0.28 s | The DB is synchronous and queries run one after another; the benefit of concurrency appears with network waits (slow or idle clients) |
+| SQLite | ~0.14 s | ~0.16 s | The DB is synchronous and local; queries run one after another and take a few ms |
 
-## Demo 4: Impact of Blocking Database I/O (No Docker Needed)
+## Demo 4: Impact of the Synchronous DB (No Docker Needed)
 
 ```bash
-python experiments/03_blocking_vs_offloaded.py
+python experiments/03_blocking_db_impact.py
 ```
-10 clients, each query simulating a 0.2 s delay: **inline ≈ 2 s** (queued sequentially) vs **to_thread ≈ 0.2–0.4 s** (overlapped in worker threads).
+10 clients: 2 ms queries ≈ 0.03 s (unnoticeable); 200 ms queries ≈ 2 s (queued one after another).
 
 ## Demo 5: Server Robustness and Graceful Shutdown
 
@@ -88,7 +88,7 @@ python experiments/03_blocking_vs_offloaded.py
 ```bash
 pytest -v
 ```
-`tests/test_async_server.py` spins up a real server and connects real TCP clients: 20 concurrent clients, an idle client, a slow database, mid-request disconnection, unexpected exceptions, and status codes 408/400/413/503. `tests/test_persistence.py` verifies database persistence using SQLite.
+`tests/test_async_server.py` spins up a real server and connects real TCP clients: 20 concurrent clients, an idle client, mid-request disconnection, unexpected exceptions, and status codes 408/400/413. `tests/test_persistence.py` verifies database persistence using SQLite.
 
 ## Saved Benchmark Evidence
 

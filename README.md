@@ -4,7 +4,7 @@
 [![SQLAlchemy](https://img.shields.io/badge/ORM-SQLAlchemy-red.svg)](https://www.sqlalchemy.org/)
 [![asyncio](https://img.shields.io/badge/Network-asyncio-orange.svg)](https://docs.python.org/3/library/asyncio.html)
 [![Rich](https://img.shields.io/badge/CLI-Rich-blueviolet.svg)](https://rich.readthedocs.io/)
-[![Tests](https://img.shields.io/badge/Tests-49%20passing-brightgreen.svg)](https://docs.pytest.org/)
+[![Tests](https://img.shields.io/badge/Tests-47%20passing-brightgreen.svg)](https://docs.pytest.org/)
 [![Ruff](https://img.shields.io/badge/PEP%208-ruff-black.svg)](https://docs.astral.sh/ruff/)
 
 > 🌐 **Language:** **English (README.md)** | [Català (README_CAT.md)](README_CAT.md)
@@ -17,8 +17,8 @@
 
 This version implements:
 - **Asynchronous multi-client server:** `asyncio.start_server` creates **one Task per client**, all running on a single thread (the event loop). An idle or slow client never blocks the others.
-- **Blocking database kept off the event loop:** SQLAlchemy + psycopg2 run in worker threads (`asyncio.to_thread`), limited by an `asyncio.Semaphore`.
-- **Robustness:** read timeout (408), maximum body size (413), maximum connections (503), clean handling of abrupt disconnections and graceful shutdown with Ctrl+C.
+- **Synchronous database, impact analysed**: SQLAlchemy + psycopg2 are called directly from the event loop (queries of a few ms). The impact is measured in docs/DB_ACCESS_ANALYSIS_ENG.md.
+- **Robustness:** read timeout (408), maximum body size (413), clean handling of abrupt disconnections and graceful shutdown with Ctrl+C.
 - **Unchanged protocol and business layer:** the REST-inspired HTTP/1.1 + JSON protocol, the services, the Router and the persistence layer from Practice 1 are reused as they were.
 - **Automated tests:** services, router, protocol serialization/deserialization and real multi-client scenarios over TCP.
 
@@ -114,7 +114,7 @@ python client/load_test_client.py --clients 20 --idle-clients 3   # plus 3 idle 
 ```bash
 python experiments/01_await_vs_task.py          # two awaits in a row are NOT concurrent; gather is
 python experiments/02_blocking_call.py          # a blocking call freezes the event loop
-python experiments/03_blocking_vs_offloaded.py  # blocking DB inline vs to_thread (no PostgreSQL needed)
+python experiments/03_blocking_db_impact.py  # impact of the synchronous DB: 2 ms vs 200 ms queries (no PostgreSQL needed)
 ```
 
 ---
@@ -124,14 +124,14 @@ python experiments/03_blocking_vs_offloaded.py  # blocking DB inline vs to_threa
 ```bash
 pytest -v
 ```
-All **49 tests** pass (they do not need PostgreSQL):
+All **47 tests** pass (they do not need PostgreSQL):
 
 | Area | Test files |
 |---|---|
 | Services | `test_services.py` |
 | Router | `test_router.py` |
 | Protocol serialization / deserialization | `test_request_parser.py`, `test_response_builder.py`, `test_async_request_reader.py` |
-| Multi-client and robustness | `test_async_server.py` (20 concurrent clients, idle client, slow DB, disconnection, unexpected error, 408, 400, 413, 503, Practice 1 client) |
+| Multi-client and robustness | `test_async_server.py` (20 concurrent clients, idle client, disconnection, unexpected error, 408, 400, 413, Practice 1 client) |
 
 PEP 8 check:
 ```bash

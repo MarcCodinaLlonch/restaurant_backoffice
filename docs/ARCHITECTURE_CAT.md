@@ -6,7 +6,7 @@
 
 - **Pràctica 1:** servidor TCP amb sockets bloquejants. Atenia **un client alhora**: mentre esperava un `recv()`, la resta de clients feien cua.
 - **Pràctica 2:** servidor amb `asyncio.start_server`. Cada client té **la seva Task** i totes comparteixen **un sol fil** (l'event loop). Quan una Task fa `await`, cedeix el torn a les altres.
-- La base de dades (SQLAlchemy + psycopg2) és **bloquejant**, així que s'executa **en fils** (`asyncio.to_thread`) limitats per un `asyncio.Semaphore`. Així l'event loop no es queda mai aturat.
+- La base de dades (SQLAlchemy + psycopg2) és **síncrona** i el Router es crida **directament** des de l'event loop: les consultes duren pocs mil·lisegons. L'impacte està analitzat a [DB_ACCESS_ANALYSIS_CAT.md](DB_ACCESS_ANALYSIS_CAT.md).
 - Les capes de protocol, negoci i persistència de la P1 es reutilitzen **sense canvis**.
 
 ## 2. Diagrama de capes
@@ -24,7 +24,6 @@ flowchart TD
         SS["asyncio.start_server (server.py)"]
         CH["ClientConnectionHandler.handle_client (1 Task per client)"]
         RR["read_request (StreamReader)"]
-        RD["RequestDispatcher (to_thread + Semaphore)"]
     end
 
     subgraph PROTO["Capa de protocol (P1)"]
@@ -47,11 +46,10 @@ flowchart TD
     SS -- "crea una Task" --> CH
     CH -- "await" --> RR
     RR --> RP
-    CH -- "await" --> RD
-    RD -- "fil del ThreadPool" --> RT
+    CH -- "crida directa (síncrona)" --> RT
     RT --> SV
     SV --> UOW
-    UOW -- "SQL bloquejant" --> DB
+    UOW -- "SQL síncron (pocs ms)" --> DB
     RT --> RB
 ```
 
@@ -65,25 +63,20 @@ sequenceDiagram
     participant A as Client A
     participant B as Client B
     participant EL as Event loop (1 fil)
-    participant TP as Fil del ThreadPool
     participant DB as PostgreSQL
 
     A->>EL: connecta (start_server crea la Task A)
     B->>EL: connecta (start_server crea la Task B)
-    A->>EL: GET /dishes
-    Note over EL: Task A: await read_request()
-    EL->>TP: Task A: await to_thread(router.handle_request)
-    TP->>DB: SELECT ... (bloqueja NOMÉS aquest fil)
+    Note over EL: Task A: await read_request() (espera la xarxa, el loop queda lliure)
     B->>EL: GET /categories
-    Note over EL: L'event loop està lliure i atén la Task B
-    EL->>TP: Task B: await to_thread(router.handle_request)
-    TP->>DB: SELECT ...
-    DB-->>TP: files de plats
-    TP-->>EL: bytes HTTP 200
-    EL-->>A: write() + await drain(), close()
-    DB-->>TP: files de categories
-    TP-->>EL: bytes HTTP 200
+    Note over EL: Task B: petició completa
+    EL->>DB: Task B: router.handle_request() (síncron, pocs ms)
+    DB-->>EL: files de categories
     EL-->>B: write() + await drain(), close()
+    A->>EL: GET /dishes (arriba més tard)
+    EL->>DB: Task A: router.handle_request() (síncron, pocs ms)
+    DB-->>EL: files de plats
+    EL-->>A: write() + await drain(), close()
 ```
 
 ## 4. Abans vs després
@@ -110,11 +103,10 @@ flowchart LR
 |---|---|
 | `server/server.py` | Munta les peces i arrenca `asyncio.start_server` (`async with server` + `serve_forever`) |
 | `server/src/network/connection_handler.py` | La vida d'UNA connexió: llegir → processar → respondre → tancar |
-| `server/src/network/request_dispatcher.py` | Treu la BD (bloquejant) de l'event loop amb `to_thread` + `Semaphore` |
 | `server/src/protocol/async_request_reader.py` | `read_request()`: llegeix una petició HTTP del `StreamReader` (capçaleres + `Content-Length`) |
 | `server/src/protocol/request_parser.py` | `RequestParser`: funcions pures, bytes → `HttpRequest` |
 | `server/src/protocol/router.py` | `Router`: decideix quin servei crida segons mètode i ruta (codi de la P1) |
-| `server/src/protocol/response_builder.py` | `ResponseBuilder`: construeix els bytes de la resposta HTTP (200, 404, 408, 413, 503...) |
+| `server/src/protocol/response_builder.py` | `ResponseBuilder`: construeix els bytes de la resposta HTTP (200, 400, 404, 408, 413...) |
 | `server/src/services/` | Lògica de negoci i validacions (codi de la P1, sense canvis) |
 | `server/src/persistence/` | Models ORM, repositoris, Unit of Work i l'únic *engine* de SQLAlchemy |
 | `server/src/bootstrap.py` | Connecta les capes: persistència → serveis → router |
@@ -124,11 +116,10 @@ flowchart LR
 Protocol *stateless*: **1 connexió = 1 petició**.
 
 1. El client connecta i `asyncio.start_server` crea una **Task nova** que executa `handle_client(reader, writer)`.
-2. Si ja hi ha massa connexions actives, es respon **503** directament.
-3. `read_request()` llegeix la petició dins `asyncio.timeout(READ_TIMEOUT_SECONDS)`.
-4. `dispatcher.dispatch(request)` espera un lloc al semàfor i executa el Router amb `asyncio.to_thread`.
-5. `writer.write(response)` + `await writer.drain()` (*backpressure*).
-6. `finally`: `writer.close()` + `await writer.wait_closed()`. El socket es tanca **sempre**, fins i tot si hi ha hagut errors.
+2. `read_request()` llegeix la petició dins `asyncio.timeout(READ_TIMEOUT_SECONDS)`.
+3. `router.handle_request(request)` es crida directament (síncron): Router → Services → BD, pocs mil·lisegons.
+4. `writer.write(response)` + `await writer.drain()` (*backpressure*).
+5. `finally`: `writer.close()` + `await writer.wait_closed()`. El socket es tanca **sempre**, fins i tot si hi ha hagut errors.
 
 Un error inesperat només fa fallar la Task d'aquell client: el servidor continua atenent els altres.
 
@@ -136,8 +127,6 @@ Un error inesperat només fa fallar la Task d'aquell client: el servidor continu
 |---|---|---|
 | `READ_TIMEOUT_SECONDS` | 5 s | **408** Request Timeout |
 | `MAX_BODY_SIZE` | 1 MB | **413** Payload Too Large |
-| `MAX_CONNECTIONS` | 50 | **503** Service Unavailable |
-| `DB_MAX_CONCURRENCY` | 5 (= `pool_size` de SQLAlchemy) | La petició espera torn al `Semaphore` (sense bloquejar el loop) |
 
 ## 7. Graceful shutdown
 

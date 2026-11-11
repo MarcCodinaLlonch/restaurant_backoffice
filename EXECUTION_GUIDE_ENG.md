@@ -41,8 +41,8 @@ pytest -v
 ```
 
 **Expected Output:**
-A green list confirming **49 tests passed (100% PASSED)** in about one second:
-- Real multi-client scenarios against the asyncio server (20 concurrent clients, idle client, slow DB, 408/400/413/503).
+A green list confirming **47 tests passed (100% PASSED)** in about one second:
+- Real multi-client scenarios against the asyncio server (20 concurrent clients, idle client, 408/400/413).
 - HTTP stream parsing and response framing.
 - Business logic across all domain services using Mocks.
 - Router dispatching and 404 error handling.
