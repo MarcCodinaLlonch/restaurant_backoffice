@@ -10,6 +10,7 @@ load_test_client.py: Llançador automàtic de clients per DEMOSTRAR la concurrè
 import argparse
 import asyncio
 import os
+import ssl
 import sys
 import time
 
@@ -26,11 +27,12 @@ console = Console()
 
 
 async def send_request(host: str, port: int, path: str) -> tuple[int, float]:
-    """Un client: connecta, envia un GET, llegeix la resposta. Retorna (codi HTTP, segons)."""
+    """Un client: connecta amb TLS, envia un GET i llegeix la resposta (codi HTTP, segons)."""
     start = time.perf_counter()
     try:
-        # CLAU: open_connection crea StreamReader/StreamWriter al client (com al server).
-        reader, writer = await asyncio.open_connection(host, port)
+        # CLAU: open_connection amb ssl._create_unverified_context() per al certificat autosignat.
+        ssl_ctx = ssl._create_unverified_context()
+        reader, writer = await asyncio.open_connection(host, port, ssl=ssl_ctx)
         writer.write(encode_request("GET", path, host, port))
         await writer.drain()
         raw_response = await reader.read()  # el servidor tanca en acabar (Connection: close)
@@ -44,8 +46,9 @@ async def send_request(host: str, port: int, path: str) -> tuple[int, float]:
 
 async def idle_client(host: str, port: int, seconds: float) -> None:
     """Client "mut": connecta i no envia res. Demostra que no bloqueja els altres."""
-    # CLAU: obre connexió i no envia res per demostrar el timeout 408 i que no bloqueja el loop.
-    _, writer = await asyncio.open_connection(host, port)
+    # CLAU: obre connexió TLS i no envia res per demostrar el timeout 408 sense bloquejar el loop.
+    ssl_ctx = ssl._create_unverified_context()
+    _, writer = await asyncio.open_connection(host, port, ssl=ssl_ctx)
     await asyncio.sleep(seconds)
     writer.close()
     await writer.wait_closed()

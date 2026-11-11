@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import os
+import ssl
 import sys
 
 # Afegim l'arrel del projecte al sys.path per poder importar el paquet 'server'.
@@ -23,6 +24,8 @@ from server.src.persistence.config import (  # noqa: E402
     READ_TIMEOUT_SECONDS,
     SERVER_HOST,
     SERVER_PORT,
+    SSL_CERT_FILE,
+    SSL_KEY_FILE,
 )
 
 logging.basicConfig(
@@ -38,15 +41,23 @@ async def main() -> None:
     uow_factory = create_uow_factory(DB_URL)
     router = create_router(uow_factory)
 
-    # 2. Capa de xarxa asíncrona (nou a la Pràctica 2).
+    # 2. Configuració TLS del servidor (Pràctica 3: certificat autosignat amb OpenSSL).
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ssl_context.load_cert_chain(certfile=SSL_CERT_FILE, keyfile=SSL_KEY_FILE)
+
+    # 3. Capa de xarxa asíncrona amb xifratge TLS (Pràctica 2 + Pràctica 3).
     handler = ClientConnectionHandler(
         router=router,
         read_timeout=READ_TIMEOUT_SECONDS,
         max_body_size=MAX_BODY_SIZE,
     )
-    # CLAU: handle_client va sense parèntesis; asyncio la crida en una Task nova per client.
-    server = await asyncio.start_server(handler.handle_client, SERVER_HOST, SERVER_PORT)
-    logger.info("Listening on %s:%s (Ctrl+C to stop)", SERVER_HOST, SERVER_PORT)
+    # CLAU: passem ssl=ssl_context perquè asyncio embolcalli cada socket amb TLS automàticament.
+    server = await asyncio.start_server(
+        handler.handle_client, SERVER_HOST, SERVER_PORT, ssl=ssl_context
+    )
+    logger.info(
+        "Listening on https://%s:%s (TLS active, Ctrl+C to stop)", SERVER_HOST, SERVER_PORT
+    )
 
     try:
         # 'async with' garanteix que el socket d'escolta es tanca en sortir.

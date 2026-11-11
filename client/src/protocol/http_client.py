@@ -1,7 +1,9 @@
-# http_client.py: client HTTP sobre sockets TCP (dict ⇄ bytes HTTP, envia i rep).
+# http_client.py: client HTTP sobre sockets TCP/TLS (dict ⇄ bytes HTTP, envia i rep).
 
+import hashlib
 import json
 import socket
+import ssl
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -41,8 +43,11 @@ def encode_request(method: str, path: str, host: str, port: int, body: Any = Non
     ]
 
     if body_bytes:
+        body_hash = hashlib.sha256(body_bytes).hexdigest()
         request_lines.append("Content-Type: application/json; charset=utf-8")
         request_lines.append(f"Content-Length: {len(body_bytes)}")
+        # CLAU (Pràctica 3): afegim el hash SHA-256 del cos per verificar-ne la integritat.
+        request_lines.append(f"Content-Hash: {body_hash}")
 
     request_text = "\r\n".join(request_lines) + "\r\n\r\n"
     return request_text.encode("utf-8") + body_bytes
@@ -63,14 +68,33 @@ def decode_response(raw_bytes: bytes) -> ApiResponse:
     split_idx = raw_bytes.find(b"\r\n\r\n")
     if split_idx != -1:
         raw_headers = raw_bytes[:split_idx].decode("utf-8", errors="replace")
-        raw_body = raw_bytes[split_idx + 4 :].decode("utf-8", errors="replace")
+        raw_body_bytes = raw_bytes[split_idx + 4 :]
+        raw_body = raw_body_bytes.decode("utf-8", errors="replace")
     else:
         raw_headers = raw_bytes.decode("utf-8", errors="replace")
+        raw_body_bytes = b""
         raw_body = ""
 
     header_lines = raw_headers.split("\r\n")
     status_line = header_lines[0].split()
     status_code = int(status_line[1]) if len(status_line) > 1 else 500
+
+    # CLAU (Pràctica 3): si el servidor envia Content-Hash, comprovem que el cos no s'ha alterat.
+    headers_dict: dict[str, str] = {}
+    for line in header_lines[1:]:
+        if ":" in line:
+            key, val = line.split(":", 1)
+            headers_dict[key.strip().lower()] = val.strip()
+
+    expected_hash = headers_dict.get("content-hash")
+    if expected_hash and raw_body_bytes:
+        actual_hash = hashlib.sha256(raw_body_bytes).hexdigest()
+        if actual_hash != expected_hash:
+            return ApiResponse(
+                status_code=500,
+                data=None,
+                error_message="Error d'integritat: el Content-Hash de la resposta no coincideix.",
+            )
 
     parsed_data = None
     if raw_body.strip():
@@ -91,20 +115,35 @@ def decode_response(raw_bytes: bytes) -> ApiResponse:
 
 class HttpClient:
     """
-    Client TCP que envia peticions HTTP/1.1 al Servidor del Restaurant BackOffice.
+    Client TCP/TLS que envia peticions HTTP/1.1 al Servidor del Restaurant BackOffice.
     """
 
-    def __init__(self, host: str = "localhost", port: int = 8088, timeout: float = 10.0):
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 8088,
+        timeout: float = 10.0,
+        use_ssl: bool = True,
+    ):
         self.host = host
         self.port = port
         self.timeout = timeout
+        self.use_ssl = use_ssl
 
     def _send_request(self, method: str, path: str, body: Any = None) -> ApiResponse:
         """
-        Mètode intern que obre el socket TCP, envia la petició i rep la resposta.
+        Mètode intern que obre el socket TCP/TLS, envia la petició i rep la resposta.
         """
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(self.timeout)
+        raw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        raw_sock.settimeout(self.timeout)
+
+        # CLAU (Pràctica 3): ssl._create_unverified_context() accepta el certificat autosignat
+        # del servidor sense llançar CERTIFICATE_VERIFY_FAILED.
+        if self.use_ssl:
+            context = ssl._create_unverified_context()
+            sock = context.wrap_socket(raw_sock, server_hostname=self.host)
+        else:
+            sock = raw_sock
 
         try:
             sock.connect((self.host, self.port))

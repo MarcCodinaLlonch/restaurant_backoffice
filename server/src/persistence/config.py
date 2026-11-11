@@ -30,3 +30,7 @@ SERVER_PORT = int(os.getenv("SERVER_PORT", "8088"))
 # Límits de seguretat de la xarxa (AsyncIO)
 READ_TIMEOUT_SECONDS = float(os.getenv("READ_TIMEOUT_SECONDS", "5.0"))
 MAX_BODY_SIZE = int(os.getenv("MAX_BODY_SIZE", "1048576"))  # 1 MB
+
+# Certificats TLS del servidor (Pràctica 3: generats a mà amb OpenSSL)
+SSL_CERT_FILE = os.getenv("SSL_CERT_FILE", "certs/cert.pem")
+SSL_KEY_FILE = os.getenv("SSL_KEY_FILE", "certs/key.pem")
