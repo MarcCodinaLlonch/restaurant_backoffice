@@ -113,7 +113,7 @@ async def test_interactive_sync_client_works_unchanged(server_port: int):
     """El HttpClient de la P1 (sockets bloquejants) funciona igual: el protocol no ha canviat.
     És un client bloquejant: el cridem amb to_thread perquè no aturi l'event loop del TEST,
     que és el mateix on corre el servidor de prova. (El servidor real no fa servir fils.)"""
-    client = HttpClient(host=HOST, port=server_port, timeout=2.0)
+    client = HttpClient(host=HOST, port=server_port, timeout=2.0, use_ssl=False)
     response = await asyncio.to_thread(client.get, "/categories")
     assert response.is_success
     assert response.data == [{"id": 1, "category_name": "Begudes"}]
