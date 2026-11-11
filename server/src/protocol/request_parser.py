@@ -1,7 +1,4 @@
-# request_parser.py: Converteix bytes HTTP en un objecte HttpRequest.
-#
-# CONCEPTE: funcions PURES (no fan I/O). Reben bytes i retornen objectes.
-# Qui llegeix del socket és async_request_reader.py; aquí només interpretem.
+# request_parser.py: converteix els bytes d'una petició HTTP en un objecte HttpRequest.
 import json
 from dataclasses import dataclass, field
 from typing import Any
@@ -10,6 +7,7 @@ from urllib.parse import parse_qs, urlparse
 from .errors import ProtocolError
 
 
+# CLAU: dataclass amb la petició ja entesa; body és None fins que s'ha llegit el cos.
 @dataclass
 class HttpRequest:
     """
@@ -37,6 +35,8 @@ class RequestParser:
         Retorna un objecte HttpRequest amb body=None.
         Llança ProtocolError si el format de la capçalera és invàlid.
         """
+        # CLAU: funció pura (sense await ni I/O); claus de headers en minúscules (HTTP insensitiu)
+        # i urlparse separa la ruta (raw_path) dels filtres (query_params).
         raw_text = head_bytes.decode("utf-8", errors="replace")
         lines = raw_text.split("\r\n")
         if not lines or not lines[0].strip():

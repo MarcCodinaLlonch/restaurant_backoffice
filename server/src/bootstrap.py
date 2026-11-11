@@ -1,10 +1,4 @@
-"""
-bootstrap.py: Prepara la base de dades i munta les capes del servidor.
-
-CONCEPTE: separació de responsabilitats.
-Aquest fitxer només "connecta les peces" (persistència -> serveis -> router).
-No sap res de xarxa ni d'asyncio.
-"""
+"""bootstrap.py: prepara la base de dades i munta les capes del servidor (serveis i Router)."""
 
 import logging
 
@@ -37,6 +31,8 @@ def create_uow_factory(db_url: str) -> UnitOfWorkFactory:
 
 def create_router(uow_factory: UnitOfWorkFactory) -> Router:
     """Crea els 6 serveis de negoci i el Router de la Pràctica 1 (reutilitzat sense canvis)."""
+    # CLAU: els 6 serveis reben la mateixa uow_factory (injecció de dependències);
+    # aquest fitxer no sap res de xarxa ni d'asyncio.
     return Router(
         category_service=CategoryService(uow_factory),
         allergen_service=AllergenService(uow_factory),

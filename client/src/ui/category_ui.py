@@ -1,9 +1,5 @@
-# category_ui.py: Interfície d'usuari per a la Gestió de Categories (Client).
-#
-# CONCEPTE CLAU PER A DAM (UI Desacoblada de la BD):
-# Aquesta interfície no té cap accés a la base de dades ni a SQLAlchemy.
-# Tota la informació es demana a través de l'objecte 'HttpClient' per xarxa TCP.
-# Les dades rebudes es transformen en objectes 'CategoryEntity' del domini net.
+# category_ui.py: menú de consola per gestionar les categories (client).
+# CLAU: mateix patró que dish_ui.py (demanar dades → HttpClient → mostrar).
 
 from rich import box
 from rich.console import Console

@@ -1,13 +1,4 @@
-"""
-connection_handler.py: Gestiona la vida d'UNA connexió de client.
-
-CONCEPTE: asyncio.start_server() crea una Task nova per cada client i hi executa
-handle_client(reader, writer). Cada client té la seva Task, i totes comparteixen
-un sol fil (l'event loop). Quan una Task fa `await`, cedeix el torn a les altres.
-
-Cicle de vida d'una connexió (protocol stateless: 1 connexió = 1 petició):
-    connecta -> llegim la petició -> la processem -> responem -> tanquem
-"""
+"""connection_handler.py: atén cada client connectat (una Task per client)."""
 
 import asyncio
 import contextlib
@@ -43,12 +34,17 @@ class ClientConnectionHandler:
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         """Punt d'entrada: asyncio l'executa en una Task nova per cada client."""
+        # CLAU: reader ("l'orella") i writer ("la boca") per connexió; 1 connexió = 1 petició
+        # (stateless).
         client_address = writer.get_extra_info("peername")
         self._active_connections += 1
         logger.info("Client connected: %s (active: %d)", client_address, self._active_connections)
         try:
+            # CLAU: mentre espera la resposta, la Task es pausa i l'event loop atén altres clients.
             response = await self._build_response(reader, client_address)
             if response is not None:
+                # CLAU: write només prepara els bytes al buffer; drain espera que surtin
+                # (backpressure).
                 writer.write(response)
                 await writer.drain()  # CONCEPTE: backpressure
         except ConnectionError:
@@ -73,25 +69,32 @@ class ClientConnectionHandler:
         self, reader: asyncio.StreamReader, client_address: object
     ) -> bytes | None:
         """Decideix QUÈ hem de respondre. Retorna None si el client ja no espera res."""
+        # CLAU: comprovem el límit de connexions ABANS de llegir res per rebutjar ràpid (503).
         if self._active_connections > self._max_connections:
             return ResponseBuilder.service_unavailable("Server busy, try again later.")
 
         try:
             # Si el client no envia la petició sencera a temps -> 408.
+            # CLAU: el cronòmetre engloba TOTA la lectura (capçaleres + cos)
+            # per evitar bloquejos (408).
             async with asyncio.timeout(self._read_timeout):
                 request = await read_request(reader, self._max_body_size)
         except TimeoutError:
             logger.warning("Read timeout with client %s", client_address)
             return ResponseBuilder.request_timeout()
+        # CLAU: PayloadTooLargeError abans de ProtocolError perquè n'és filla (evita 400).
+        # Retornem bytes d'error directament; la petició no arriba a la base de dades.
         except PayloadTooLargeError as error:
             return ResponseBuilder.payload_too_large(str(error))
         except ProtocolError as error:
             logger.warning("Protocol error with client %s: %s", client_address, error)
             return ResponseBuilder.bad_request(str(error))
 
+        # CLAU: si request és None el client ha tancat la connexió neta (EOF); no es respon res.
         if request is None:
             logger.info("Client %s closed without sending a request", client_address)
             return None
 
         logger.info("%s %s from %s", request.method, request.raw_path, client_address)
+        # CLAU: la Task es pausa mentre el fil secundari del dispatcher fa la feina de la BD.
         return await self._dispatcher.dispatch(request)

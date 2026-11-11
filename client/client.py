@@ -1,9 +1,4 @@
-# client.py: Punt d'entrada de l'aplicació Client per a Restaurant BackOffice.
-#
-# CONCEPTE CLAU PER A DAM (Client TCP Independent):
-# Aquest programa s'executa de forma completament independent del Servidor.
-# No requereix cap connexió directa a la base de dades ni instal·lació de PostgreSQL.
-# Només necessita conèixer la IP i Port del Servidor per comunicar-s'hi per xarxa TCP.
+# client.py: punt d'entrada del client. Mostra el menú principal i parla amb el servidor per TCP.
 
 import os
 import sys
@@ -11,6 +6,7 @@ import sys
 # Assegurem que l'arrel del projecte és la primera ruta de sys.path
 # i eliminem el directori 'client' de sys.path perquè Python no confongui
 # el fitxer 'client.py' amb el paquet 'client'
+# CLAU: traiem 'client' de sys.path perquè Python no confongui el fitxer client.py amb el paquet.
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 if current_dir in sys.path:
@@ -97,6 +93,7 @@ if __name__ == "__main__":
     port = int(os.getenv("SERVER_PORT", "8088"))
 
     # Instanciem el client HTTP sobre TCP
+    # CLAU: HttpClient només desa host i port (configuració); encara no obre cap connexió TCP.
     client = HttpClient(host=host, port=port)
 
     # Iniciem la interfície d'usuari

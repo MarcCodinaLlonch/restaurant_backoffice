@@ -1,13 +1,4 @@
-# router.py: Encamina les peticions HTTP cap al servei corresponent.
-#
-# CONCEPTE CLAU PER A DAM (Patró Router / Controlador):
-# El Router inspecciona el mètode (GET, POST, PUT, DELETE) i la ruta (/categories, /dishes/1...)
-# per determinar quina funció del Service ha d'executar.
-# A més:
-# - Extreu els paràmetres de la URL (com els IDs numèrics).
-# - Valida tipus de dades i captura excepcions com ValueError -> 400 Bad Request.
-# - Si la ruta no coincideix amb cap servei -> 404 Not Found.
-# - Retorna la resposta formatejada en bytes gràcies a ResponseBuilder.
+# router.py: decideix quin servei atén cada petició segons el mètode i la ruta.
 
 from datetime import date
 
@@ -50,6 +41,7 @@ class Router:
         """
         Punt d'entrada que processa una petició i retorna els bytes de la resposta HTTP.
         """
+        # CLAU: s'executa al fil secundari (to_thread); d'aquí cap avall no hi ha cap await.
         if not request:
             return ResponseBuilder.bad_request("Petició invàlida o incompleta.")
 
@@ -59,6 +51,7 @@ class Router:
             path = "/"
 
         # Dividim la ruta en segments (ex: '/categories/5' -> ['categories', '5'])
+        # CLAU: '/dishes/11' -> ['dishes', '11']; parts[0] = recurs, len(parts) = operació.
         parts = [part for part in path.split("/") if part]
 
         try:
@@ -97,6 +90,7 @@ class Router:
             # Recurs no reconegut
             return ResponseBuilder.not_found(f"Recurs '{resource}' no trobat al servidor.")
 
+        # CLAU: ValueError (regla de negoci dels serveis) -> 400; error inesperat -> 500.
         except ValueError as error:
             # Errors de validació de negoci controlats
             return ResponseBuilder.bad_request(str(error))
@@ -118,6 +112,7 @@ class Router:
     @staticmethod
     def _no_content_or_not_found(done: bool, not_found_message: str) -> bytes:
         """204 si l'esborrat s'ha fet; si no, 404."""
+        # CLAU: 204 No Content indica esborrat correcte i sense cos de resposta.
         if done:
             return ResponseBuilder.no_content()
         return ResponseBuilder.not_found(not_found_message)
@@ -200,6 +195,8 @@ class Router:
         # POST /dishes -> Crear plat
         if len(parts) == 1 and method == "POST":
             body = request.body or {}
+            # CLAU: .get() amb defecte evita fallades si falta un camp; int()/bool() forcen tipus.
+            # El Router només valida tipus i delega; mai toca la base de dades directament.
             dish = self.dishes.create(
                 dish_name=body.get("dish_name", ""),
                 id_category=int(body.get("id_category", 0)),
@@ -354,6 +351,7 @@ class Router:
         # ?date_from=A&date_to=B, ?page=1)
         if len(parts) == 1 and method == "GET":
             params = request.query_params
+            # CLAU: fromisoformat llança ValueError si el format no és YYYY-MM-DD -> 400.
             if "date" in params:
                 sale_date = date.fromisoformat(params["date"])
                 sales = self.sales.get_by_date(sale_date)

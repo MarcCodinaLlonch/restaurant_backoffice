@@ -1,5 +1,6 @@
 # sale_service.py: Lògica de negoci per a la Gestió de Vendes.
 # Relació N:M amb atributs (Menu i Employee associats amb sale_date i quantity_sold).
+# CLAU: mateix patró que dish_service.py (validar → with uow → repositori → mapper).
 
 from datetime import date
 from typing import List, Optional
@@ -30,6 +31,7 @@ class SaleService:
         self, id_menu: int, id_employee: int, sale_date_val: date
     ) -> Optional[SaleEntity]:
         """Recupera una venda per la seva clau primària composta (tupla)."""
+        # CLAU: la clau primària és composta per tupla: (id_menu, id_employee, sale_date).
         with self.uow_factory.create() as uow:
             sale = uow.sales.get((id_menu, id_employee, sale_date_val))
             if not sale:
@@ -115,6 +117,7 @@ class SaleService:
 
     def get_by_date_range(self, date_from: date, date_to: date) -> List[SaleEntity]:
         """Cerca vendes en un rang de dates."""
+        # CLAU: validem abans de la BD que la data d'inici no superi la de fi (ValueError -> 400).
         if date_from > date_to:
             raise ValueError("La data d'inici no pot ser posterior a la data de fi.")
         with self.uow_factory.create() as uow:

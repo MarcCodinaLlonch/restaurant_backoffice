@@ -5,10 +5,12 @@ import os
 
 from dotenv import load_dotenv
 
+# CLAU: load_dotenv llegeix .env, però les variables ja exportades al sistema tenen prioritat.
 load_dotenv()
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
+# CLAU: tria la BD segons ENVIRONMENT (a tests fem servir SQLite en memòria per rapidesa).
 DB_URL = {
     "development": os.getenv(
         "DB_URL_DEVELOPMENT",

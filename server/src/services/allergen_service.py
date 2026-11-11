@@ -1,4 +1,5 @@
 # allergen_service.py: Lògica de negoci per als Al·lèrgens.
+# CLAU: mateix patró que dish_service.py (validar → with uow → repositori → mapper).
 
 from typing import List, Optional
 

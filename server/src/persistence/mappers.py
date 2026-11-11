@@ -1,10 +1,5 @@
-# mappers.py: Tradueix entre els models ORM de SQLAlchemy i les Entitats de Domini netes.
-#
-# CONCEPTE CLAU PER A DAM (Mappers / Object-to-Entity Mapping):
-# La persistència de la base de dades utilitza objectes 'Category', 'Employee'
-# lligats a SQLAlchemy. Però el servei i el protocol només han de retornar
-# objectes purs ('CategoryEntity', 'EmployeeEntity').
-# Aquest fitxer conté funcions auxiliars per fer aquesta traducció neta i centralitzada.
+# mappers.py: tradueix els models de SQLAlchemy a entitats de common/.
+# CLAU: el model ORM només existeix al servidor; l'entitat viatja al client (mai el hash).
 
 from common.domain.entities import (
     AllergenEntity,
@@ -22,6 +17,7 @@ def category_to_entity(category: Category) -> CategoryEntity:
     """Converteix un model ORM Category a CategoryEntity."""
     if not category:
         return None
+    # CLAU: isoformat() converteix date/datetime a string ISO per poder serialitzar a JSON.
     return CategoryEntity(
         id=category.id,
         category_name=category.category_name,

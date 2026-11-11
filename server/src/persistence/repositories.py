@@ -1,7 +1,4 @@
-# repositories.py defineix la capa de persistència de dades mitjançant el patró Repositori.
-# Crea una capa intermèdia entre la base de dades i la lògica del programa.
-# El programa no parla directament amb SQL, fa servir repositoris per guardar (add),
-# recuperar (get), actualitzar (update) o esborrar (delete) objectes.
+# repositories.py: patró Repository; guarda i busca a la BD sense escriure SQL.
 
 from collections.abc import Iterable
 from typing import Generic, Optional, TypeVar
@@ -16,6 +13,7 @@ K = TypeVar("K")  # K: Tipus de la clau primària (int, o tupla per a Sale)
 V = TypeVar("V")  # V: Tipus del model ORM (Category, Employee, Dish...)
 
 
+# CLAU: Repository genèric: hereta add/get/update/delete; cada taula afegeix les seves consultes.
 class Repository(Generic[K, V]):
     """
     Repositori Genèric: classe base amb operacions CRUD bàsiques.
@@ -29,6 +27,7 @@ class Repository(Generic[K, V]):
     def add(self, v: V):
         self.session.add(v)
         # flush(): envia l'INSERT dins la transacció perquè la BD assigni l'id ara.
+        # CLAU: flush envia l'SQL dins la transacció oberta per tenir id; no és commit.
         self.session.flush()
 
     def delete(self, k: K):
@@ -37,9 +36,11 @@ class Repository(Generic[K, V]):
             self.session.delete(v)
 
     def update(self, v: V):
+        # CLAU: merge copia l'estat de l'objecte a la sessió activa.
         return self.session.merge(v)
 
     def get(self, id: K) -> Optional[V]:
+        # CLAU: session.get mira primer l'identity map en memòria abans d'anar a la BD.
         return self.session.get(self.model_class, id)
 
     def get_all(self) -> Iterable[V]:

@@ -1,5 +1,6 @@
 # employee_ui.py: Interfície d'usuari per a la Gestió d'Empleats (Client).
 # Comunica amb el servidor mitjançant peticions HTTP/1.1 sobre sockets TCP.
+# CLAU: mateix patró que dish_ui.py (demanar dades → HttpClient → mostrar).
 
 from rich import box
 from rich.console import Console

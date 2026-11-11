@@ -49,6 +49,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         self.session = session
 
     def __enter__(self):
+        # CLAU: els 6 repositoris comparteixen la mateixa sessió -> mateixa transacció atòmica.
         self.employees = EmployeeRepository(self.session)
         self.menus = MenuRepository(self.session)
         self.dishes = DishRepository(self.session)
@@ -58,6 +59,7 @@ class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
         return super().__enter__()
 
     def __exit__(self, exc_type, exc_value, traceback):
+        # CLAU: si exc_type hi ha hagut error -> rollback; si no -> commit; i close() sempre.
         try:
             super().__exit__(exc_type, exc_value, traceback)
         finally:
@@ -77,6 +79,7 @@ class UnitOfWorkFactory:
     """
 
     def __init__(self, database_url: str):
+        # CLAU: un sol engine (pool de connexions) al servidor; autocommit=False exigeix commit().
         self.engine = create_engine(database_url)
         self.session_class = sessionmaker(
             bind=self.engine,
@@ -86,4 +89,5 @@ class UnitOfWorkFactory:
         )
 
     def create(self) -> SqlAlchemyUnitOfWork:
+        # CLAU: sessió nova per petició (cada petició independent; mai es comparteix entre fils).
         return SqlAlchemyUnitOfWork(self.session_class())

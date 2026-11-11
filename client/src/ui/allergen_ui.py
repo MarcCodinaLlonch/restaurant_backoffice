@@ -1,4 +1,5 @@
 # allergen_ui.py: Interfície d'usuari per a la Gestió d'Al·lèrgens (Client).
+# CLAU: mateix patró que dish_ui.py (demanar dades → HttpClient → mostrar).
 
 from rich import box
 from rich.console import Console

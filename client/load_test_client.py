@@ -5,12 +5,6 @@ load_test_client.py: Llançador automàtic de clients per DEMOSTRAR la concurrè
     python client/load_test_client.py --clients 20                 # 20 clients alhora
     python client/load_test_client.py --clients 20 --sequential    # un darrere l'altre
     python client/load_test_client.py --clients 20 --idle-clients 3
-
-CONCEPTES (diapositives d'asyncio):
-- asyncio.open_connection(): client TCP asíncron (StreamReader + StreamWriter).
-- asyncio.gather(): llança N coroutines alhora i espera que acabin totes.
-- Mode --sequential: "dos await seguits NO són concurrents" -> serveix per comparar temps.
-- asyncio.create_task(): els clients inactius s'executen en segon pla mentre fem la prova.
 """
 
 import argparse
@@ -35,6 +29,7 @@ async def send_request(host: str, port: int, path: str) -> tuple[int, float]:
     """Un client: connecta, envia un GET, llegeix la resposta. Retorna (codi HTTP, segons)."""
     start = time.perf_counter()
     try:
+        # CLAU: open_connection crea StreamReader/StreamWriter al client (com al server).
         reader, writer = await asyncio.open_connection(host, port)
         writer.write(encode_request("GET", path, host, port))
         await writer.drain()
@@ -49,6 +44,7 @@ async def send_request(host: str, port: int, path: str) -> tuple[int, float]:
 
 async def idle_client(host: str, port: int, seconds: float) -> None:
     """Client "mut": connecta i no envia res. Demostra que no bloqueja els altres."""
+    # CLAU: obre connexió i no envia res per demostrar el timeout 408 i que no bloqueja el loop.
     _, writer = await asyncio.open_connection(host, port)
     await asyncio.sleep(seconds)
     writer.close()
@@ -66,10 +62,12 @@ async def run_load_test(args: argparse.Namespace) -> None:
     # 2. Clients actius: tots alhora (gather) o un darrere l'altre (await en bucle).
     start = time.perf_counter()
     if args.sequential:
+        # CLAU: mode seqüencial: dos await seguits no són concurrents; serveix per comparar temps.
         results = [
             await send_request(args.host, args.port, args.path) for _ in range(args.clients)
         ]
     else:
+        # CLAU: asyncio.gather llança N clients alhora (demostració de concurrència real).
         results = await asyncio.gather(
             *(send_request(args.host, args.port, args.path) for _ in range(args.clients))
         )

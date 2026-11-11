@@ -1,11 +1,4 @@
-# response_builder.py: Generador de respostes HTTP sobre TCP.
-#
-# CONCEPTE CLAU PER A DAM (Estructura de la Resposta HTTP/1.1):
-# Una resposta HTTP vàlida conté:
-# 1. Línia d'estat: 'HTTP/1.1 <CODI> <MISSATGE>\r\n' (ex: HTTP/1.1 200 OK)
-# 2. Capçaleres clau-valor amb la seva terminació CRLF: '\r\n'
-# 3. Una línia buida CRLF ('\r\n') que marca el final de les capçaleres.
-# 4. El cos (body) de dades, normalment JSON serialitzat en UTF-8.
+# response_builder.py: construeix les respostes HTTP (codi, capçaleres i JSON) en bytes.
 
 import json
 from typing import Any
@@ -22,6 +15,8 @@ class ResponseBuilder:
         Funció auxiliar que converteix entitats de domini (que tinguin 'to_dict()')
         o llistes d'entitats en diccionaris i llistes serialitzables a JSON.
         """
+        # CLAU: crida to_dict() d'entitats de common/ (on el servidor les usa per respondre);
+        # també accepta llistes i diccionaris.
         if data is None:
             return None
         if hasattr(data, "to_dict") and callable(data.to_dict):
@@ -47,11 +42,14 @@ class ResponseBuilder:
             # ensure_ascii=False per mantenir caràcters catalans com à, è, ç, ·
             json_bytes = json.dumps(clean_data, ensure_ascii=False).encode("utf-8")
             headers.append("Content-Type: application/json; charset=utf-8")
+            # CLAU: Content-Length es calcula sobre els BYTES de json_bytes, no sobre caràcters.
             headers.append(f"Content-Length: {len(json_bytes)}")
             # Unim les capçaleres amb \r\n, afegim línia buida final i el cos de bytes
+            # CLAU: estructura HTTP: línia d'estat + capçaleres + línia buida (\r\n\r\n) + cos.
             header_str = "\r\n".join(headers) + "\r\n\r\n"
             return header_str.encode("utf-8") + json_bytes
         else:
+            # CLAU: branca sense cos (ex: 204 No Content): sense Content-Type i Content-Length 0.
             headers.append("Content-Length: 0")
             header_str = "\r\n".join(headers) + "\r\n\r\n"
             return header_str.encode("utf-8")

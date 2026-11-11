@@ -34,12 +34,14 @@ class Employee(Base):
     )
 
     # Relació 1:N amb Sale: un empleat pot tenir moltes vendes.
+    # CLAU: relationship carrega dades en accedir-hi (lazy loading); cal sessió oberta.
     sales: Mapped[list["Sale"]] = relationship(
         # cascade="all, delete-orphan": Si eliminem empleat, eliminem les seves vendes.
         back_populates="employee",
         cascade="all, delete-orphan",
     )
 
+    # CLAU: default/onupdate els assigna SQLAlchemy automàticament en fer flush.
     last_update: Mapped[Optional[datetime]] = mapped_column(
         DateTime, nullable=True, default=datetime.utcnow, onupdate=datetime.utcnow
     )
@@ -107,6 +109,7 @@ class Category(Base):
 # Taula intermèdia per relació N:M Dish i Allergen.
 # SQLAlchemy la gestiona automàticament: quan fem dish.allergens.append(allergen),
 # insereix la fila corresponent a aquesta taula sense que ho haguem de fer manualment.
+# CLAU: taula intermèdia N:M; només conté les dues FK cap a les taules principals.
 dish_allergen = Table(
     "dish_allergen",
     Base.metadata,

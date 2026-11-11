@@ -1,12 +1,5 @@
-# category_service.py: Gestiona la lògica de negoci per a les Categories.
-#
-# CONCEPTE CLAU PER A DAM (Service Layer / Capa de Serveis):
-# El servei és l'intermediari entre el Router (que rep la petició HTTP)
-# i el Repositori (que toca la BD).
-# La seva responsabilitat és:
-# 1. Validar les regles de negoci (ex: el nom no pot estar buit).
-# 2. Gestionar la transacció obrint el Unit of Work (with self.uow_factory.create() as uow).
-# 3. Retornar entitats netes de domini (CategoryEntity), MAI models de SQLAlchemy directament.
+# category_service.py: regles de negoci de les categories.
+# CLAU: mateix patró que dish_service.py (validar → with uow → repositori → mapper).
 
 from typing import List, Optional
 

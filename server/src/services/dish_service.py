@@ -51,11 +51,14 @@ class DishService:
     ) -> DishEntity:
         """Crea un nou plat associat a una categoria existent (1:N)."""
         clean_name = (dish_name or "").strip()
+        # CLAU: validem el nom ABANS d'obrir transacció; si falla, ValueError -> el Router fa 400.
         if not clean_name:
             raise ValueError("El nom del plat no pot estar buit.")
 
+        # CLAU: obre UNA transacció; en sortir del with fa commit (o rollback si hi ha error).
         with self.uow_factory.create() as uow:
             # Validació de clau forana: la categoria ha d'existir
+            # CLAU: primera consulta real a la BD (SELECT); valida la clau forana (1:N).
             category = uow.categories.get(id_category)
             if not category:
                 raise ValueError(f"No existeix cap categoria amb ID {id_category}.")
@@ -66,7 +69,9 @@ class DishService:
                 id_category=id_category,
                 is_active=is_active,
             )
+            # CLAU: add fa flush (envia l'INSERT i obté el nou id), però NO fa commit encara.
             uow.dishes.add(new_dish)
+            # CLAU: el mapper va DINS del with perquè necessita la sessió oberta per llegir camps.
             return dish_to_entity(new_dish)
 
     def update(
@@ -118,4 +123,5 @@ class DishService:
             if not allergen:
                 raise ValueError(f"No s'ha trobat l'al·lèrgen amb ID {allergen_id}.")
 
+            # CLAU: relació N:M; add_allergen_to_dish retorna False si ja hi era (sense error).
             return uow.dishes.add_allergen_to_dish(dish_id, allergen)

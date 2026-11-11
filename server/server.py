@@ -1,11 +1,4 @@
-"""
-server.py: Punt d'entrada del servidor asíncron (asyncio) de Restaurant BackOffice.
-
-Mateixa estructura que l'exemple de classe:
-    server = await asyncio.start_server(handle_client, host, port)
-    async with server:
-        await server.serve_forever()
-"""
+"""server.py: punt d'entrada del servidor asíncron. Munta les capes i escolta al port 8088."""
 
 import asyncio
 import logging
@@ -13,6 +6,8 @@ import os
 import sys
 
 # Afegim l'arrel del projecte al sys.path per poder importar el paquet 'server'.
+# CLAU: afegim l'arrel a sys.path perquè 'import server...' funcioni
+# executant 'python server/server.py'.
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 if current_dir in sys.path:
@@ -53,12 +48,14 @@ async def main() -> None:
         max_body_size=MAX_BODY_SIZE,
         max_connections=MAX_CONNECTIONS,
     )
+    # CLAU: handle_client va sense parèntesis; asyncio la crida en una Task nova per client.
     server = await asyncio.start_server(handler.handle_client, SERVER_HOST, SERVER_PORT)
     logger.info("Listening on %s:%s (Ctrl+C to stop)", SERVER_HOST, SERVER_PORT)
 
     try:
         # 'async with' garanteix que el socket d'escolta es tanca en sortir.
         async with server:
+            # CLAU: el servidor queda escoltant; si no arriba ningú, l'event loop no gasta CPU.
             await server.serve_forever()
     finally:
         # Graceful shutdown: tanquem les connexions del pool de la BD.
@@ -70,6 +67,7 @@ if __name__ == "__main__":
     if not DB_URL:
         sys.exit("Error: no database URL configured (check the .env file).")
     try:
+        # CLAU: crea l'event loop d'un sol fil compartit per a tots els clients.
         asyncio.run(main())
     except KeyboardInterrupt:
         pass  # Ctrl+C: el 'finally' de main() ja ha fet la neteja.

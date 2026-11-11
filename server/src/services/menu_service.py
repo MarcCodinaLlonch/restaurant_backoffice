@@ -1,5 +1,6 @@
 # menu_service.py: Lògica de negoci per a la Gestió de Menús.
 # Gestiona la relació N:M amb Dish a través de la taula intermèdia menu_dish.
+# CLAU: mateix patró que dish_service.py (validar → with uow → repositori → mapper).
 
 from typing import List, Optional
 
@@ -38,6 +39,7 @@ class MenuService:
 
     def filter_by_price_range(self, min_price: float, max_price: float) -> List[MenuEntity]:
         """Filtra menús dins d'un interval de preus."""
+        # CLAU: validació de rang: preu mínim <= màxim abans de tocar la BD (ValueError -> 400).
         if min_price > max_price:
             raise ValueError("El preu mínim no pot ser superior al preu màxim.")
         with self.uow_factory.create() as uow:

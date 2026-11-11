@@ -1,17 +1,6 @@
-# entities.py: Defineix les entitats pures del domini de la nostra aplicació.
-#
-# CONCEPTE CLAU PER A DAM (Clean Domain / Domini Net):
-# Aquestes classes representen la informació del nostre negoci (plats, empleats, categories...)
-# de forma 100% independent de qualsevol tecnologia de persistència
-# (com SQLAlchemy o SQLite/PostgreSQL).
-#
-# Per què ho fem així?
-# 1. Independència: El client mai ha d'importar 'sqlalchemy' ni dependre de la base de dades.
-# 2. Reutilització: El mateix fitxer d'entitats pot viure a la carpeta 'common/' i ser
-#    utilitzat tant pel Servidor (per crear respostes) com pel Client
-#    (per rebre dades i pintar a la UI).
-# 3. Serialització fàcil: Cada classe té mètodes 'to_dict()' i 'from_dict()' per convertir
-#    les dades a diccionari Python -> JSON -> bytes per viatjar pel socket TCP.
+# entities.py: entitats del domini (dades netes) compartides pel client i el servidor.
+# CLAU: to_dict() l'usa el servidor (ResponseBuilder); from_dict() el client (UI)
+# només per mostrar dades. A les peticions el client envia dicts manuals, no entitats.
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -143,6 +132,7 @@ class DishEntity:
         return self.dish_name
 
 
+# CLAU: EmployeeEntity no porta contrasenya per seguretat; només has_credentials i email.
 @dataclass
 class EmployeeEntity:
     """

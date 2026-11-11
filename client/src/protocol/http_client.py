@@ -1,7 +1,4 @@
-# http_client.py: Client HTTP personalitzat sobre sockets TCP.
-#
-# Separa la codificació/descodificació pura de la transmissió de xarxa,
-# permetent reutilitzar-la tant al client síncron com al client asíncron de càrrega.
+# http_client.py: client HTTP sobre sockets TCP (dict ⇄ bytes HTTP, envia i rep).
 
 import json
 import socket
@@ -20,6 +17,7 @@ class ApiResponse:
     data: Any  # Dades rebudes del servidor
     error_message: Optional[str] = None  # Missatge d'error si la petició ha fallat
 
+    # propietat calculada, no és un camp desat a la memòria.
     @property
     def is_success(self) -> bool:
         """Retorna True si el codi d'estat és 2xx (èxit)."""
@@ -54,6 +52,7 @@ def decode_response(raw_bytes: bytes) -> ApiResponse:
     """
     Funció pura que converteix els bytes bruts d'una resposta HTTP en un ApiResponse.
     """
+    #mirall del servidor: separa per línia buida (\r\n\r\n), llegeix codi i fa json.loads.
     if not raw_bytes:
         return ApiResponse(
             status_code=500,
@@ -110,9 +109,11 @@ class HttpClient:
         try:
             sock.connect((self.host, self.port))
             full_request_bytes = encode_request(method, path, self.host, self.port, body)
+            #sendall insisteix fins transmetre tots els bytes (a diferència de send).
             sock.sendall(full_request_bytes)
 
             response_buffer = bytearray()
+            #bucle recv llegeix fins a b"" perquè el servidor tanca el socket en acabar.
             while True:
                 chunk = sock.recv(2048)
                 if not chunk:
@@ -121,6 +122,7 @@ class HttpClient:
 
             return decode_response(bytes(response_buffer))
 
+        # CLAU: errors de xarxa convertits a ApiResponse local (503/504/500); el client no peta.
         except ConnectionRefusedError:
             return ApiResponse(
                 status_code=503,
@@ -143,6 +145,7 @@ class HttpClient:
         finally:
             sock.close()
 
+    #dreceres HTTP; cadascuna fa l'anada (sendall) i la tornada (recv + decode_response).
     def get(self, path: str) -> ApiResponse:
         """Envia una petició GET al servidor."""
         return self._send_request("GET", path)

@@ -1,16 +1,5 @@
-"""
-request_dispatcher.py: Executa el Router (síncron) FORA de l'event loop.
-
-CONCEPTE: el Router crida els serveis, i els serveis criden SQLAlchemy + psycopg2,
-que són BLOQUEJANTS. Si els cridéssim directament dins una coroutine, l'event loop
-es quedaria aturat esperant PostgreSQL i cap altre client avançaria.
-
-Solució:
-- asyncio.to_thread() executa la funció en un fil del ThreadPoolExecutor.
-  La coroutine fa `await` i, mentrestant, l'event loop atén altres clients.
-- asyncio.Semaphore limita quantes consultes es fan alhora, perquè el pool
-  de connexions de SQLAlchemy només en té unes poques (5 per defecte).
-"""
+"""request_dispatcher.py: executa el Router en un fil secundari
+perquè la BD no bloquegi l'event loop."""
 
 import asyncio
 
@@ -27,5 +16,9 @@ class RequestDispatcher:
 
     async def dispatch(self, request: HttpRequest) -> bytes:
         """Espera un lloc lliure i executa el Router en un fil secundari."""
+        # CLAU: Semaphore(5) = mida del pool de SQLAlchemy; async with allibera el lloc
+        # fins i tot amb error.
         async with self._db_slots:
+            # CLAU: SQLAlchemy+psycopg2 bloquegen; to_thread rep la funció sense parèntesis
+            # i l'executa en un fil secundari (repte investigat no implementat: asyncpg).
             return await asyncio.to_thread(self._router.handle_request, request)

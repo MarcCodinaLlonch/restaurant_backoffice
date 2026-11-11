@@ -1,5 +1,6 @@
 # employee_service.py: Lògica de negoci per a la Gestió d'Empleats.
 # Inclou la gestió de la relació 1:1 amb AppCredential i el hashing de contrasenyes amb SHA-256.
+# CLAU: mateix patró que dish_service.py (validar → with uow → repositori → mapper).
 
 import hashlib
 from typing import List, Optional
@@ -62,12 +63,14 @@ class EmployeeService:
             raise ValueError("Tots els camps de l'empleat són obligatoris.")
 
         with self.uow_factory.create() as uow:
+            # CLAU: comprovem el DNI abans d'inserir per evitar violació d'unicitat a la BD.
             if uow.employees.national_id_exists(national_id):
                 raise ValueError(f"Ja existeix un empleat amb el DNI '{national_id}'.")
 
             new_employee = Employee(name=name, surname=surname, national_id=national_id, role=role)
 
             # Si s'han facilitat credencials d'accés (relació 1:1)
+            # CLAU: mai guardem la contrasenya en clar: fem hash SHA-256 i creem credencial 1:1.
             if email and email.strip() and password and password.strip():
                 # Protecció: mai emmagatzemar contrasenyes en text pla!
                 password_hash = hashlib.sha256(password.strip().encode()).hexdigest()

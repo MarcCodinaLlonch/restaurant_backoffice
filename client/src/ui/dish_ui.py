@@ -68,6 +68,7 @@ def list_dishes(client: HttpClient, pause: bool = True) -> None:
             console.input("\nPrem Enter per continuar...")
         return
 
+    # CLAU: el client només converteix a entitat (from_dict) quan ha de mostrar dades.
     dishes = [DishEntity.from_dict(dish) for dish in (resp.data or [])]
 
     if not dishes:
@@ -100,6 +101,7 @@ def add_dish(client: HttpClient) -> None:
     console.print("\n[bold]--- Nou Plat ---[/bold]")
 
     # Demanem les categories disponibles al servidor
+    # CLAU: GET /categories és una petició HTTP sencera independent prèvia al POST /dishes.
     categories_response = client.get("/categories")
     if not categories_response.is_success or not categories_response.data:
         console.print(
@@ -132,6 +134,7 @@ def add_dish(client: HttpClient) -> None:
         console.input("Prem Enter per continuar...")
         return
 
+    # CLAU: el payload és un dict manual, no una entitat (common/ no s'usa a les peticions).
     payload = {
         "dish_name": name.strip(),
         "id_category": category_id,
@@ -140,6 +143,7 @@ def add_dish(client: HttpClient) -> None:
     }
 
     resp = client.post("/dishes", payload)
+    # CLAU: en fer POST no cal from_dict() perquè només confirmem èxit, no mostrem dades.
     if resp.is_success:
         console.print(f"\n[green]✓ Plat '{name}' creat amb èxit al servidor![/green]")
     else:

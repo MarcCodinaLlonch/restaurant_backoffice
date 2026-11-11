@@ -24,8 +24,11 @@ async def read_request(
         - PayloadTooLargeError: Si el Content-Length supera max_body_size.
     """
     try:
+        # CLAU: lectura en dos temps (framing TCP): la línia buida marca el final de capçaleres.
+        # readuntil és de StreamReader; només cedeix el torn si les dades encara no han arribat.
         head = await reader.readuntil(b"\r\n\r\n")
     except asyncio.IncompleteReadError as exc:
+        # CLAU: exc.partial buit vol dir tancament net (EOF) -> None; si porta dades -> error.
         if not exc.partial:
             # EOF net: el client s'ha desconnectat sense demanar res
             return None
@@ -43,11 +46,13 @@ async def read_request(
     except ValueError:
         raise ProtocolError(f"Content-Length invàlid: {raw_content_length}")
 
+    # CLAU: comprovem max_body_size ABANS de llegir el cos del socket per seguretat (413).
     if content_length > max_body_size:
         raise PayloadTooLargeError(
             f"El cos ({content_length} bytes) supera el límit permès ({max_body_size} bytes)."
         )
 
+    # CLAU: readexactly llegeix N bytes de cos; a GET i DELETE (content_length 0) no s'executa.
     if content_length > 0:
         try:
             raw_body = await reader.readexactly(content_length)
