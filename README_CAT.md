@@ -87,21 +87,31 @@ Aquesta versió implementa:
    docker compose up -d
    ```
 
+6. **Generar els certificats TLS del servidor a mà amb OpenSSL (Pràctica 3):**
+   ```bash
+   mkdir -p certs
+   # 1. Generar certificat autosignat (cert.pem) i clau privada (key.pem)
+   openssl req -x509 -newkey rsa:4096 -keyout certs/key.pem -out certs/cert.pem -days 365 -nodes -subj "/CN=localhost"
+
+   # 2. (Opcional) Empaquetar en format PKCS#12 (.p12)
+   openssl pkcs12 -export -out certs/server.p12 -inkey certs/key.pem -in certs/cert.pem -passout pass:1234
+   ```
+
 ---
 
 ## 💻 Com executar l'aplicació
 
-### 1. Iniciar el servidor asíncron
+### 1. Iniciar el servidor asíncron amb TLS
 ```bash
 python server/server.py
 ```
-El servidor escolta a `0.0.0.0:8088`. S'atura amb **Ctrl+C**: es tanca de manera neta i mostra `Server stopped, resources released`.
+El servidor carrega el certificat (`certs/cert.pem` + `certs/key.pem`) amb `ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)` i escolta a `https://0.0.0.0:8088`. S'atura amb **Ctrl+C**: es tanca de manera neta i mostra `Server stopped, resources released`.
 
 ### 2. Iniciar el client interactiu (un o més terminals)
 ```bash
 python client/client.py
 ```
-Obre'l en diversos terminals alhora: tots els clients s'atenen concurrentment. El menú permet gestionar empleats (amb credencials 1:1), categories, plats (amb al·lèrgens), al·lèrgens, menús (amb plats) i vendes (clau primària composta).
+El client es connecta sobre TLS utilitzant `ssl._create_unverified_context()` per acceptar el certificat autosignat del servidor i verifica la integritat de cada missatge amb la capçalera `Content-Hash` (SHA-256). Obre'l en diversos terminals alhora: tots els clients s'atenen concurrentment.
 
 ### 3. Llançador automàtic de clients (prova de càrrega)
 ```bash
@@ -124,7 +134,7 @@ python experiments/03_blocking_db_impact.py  # impacte de la BD síncrona: consu
 ```bash
 pytest -v
 ```
-Passen els **47 tests** (no necessiten PostgreSQL):
+Passen els **50 tests** (no necessiten PostgreSQL):
 
 | Àrea | Fitxers de tests |
 |---|---|
@@ -132,6 +142,7 @@ Passen els **47 tests** (no necessiten PostgreSQL):
 | Router | `test_router.py` |
 | Serialització / deserialització del protocol | `test_request_parser.py`, `test_response_builder.py`, `test_async_request_reader.py` |
 | Multiclient i robustesa | `test_async_server.py` (20 clients alhora, client inactiu, desconnexió, error inesperat, 408, 400, 413, client de la P1) |
+| Seguretat TLS i `Content-Hash` | `test_security_tls.py` (certificat autosignat amb OpenSSL, `ssl._create_unverified_context()`, integritat SHA-256) |
 
 Comprovació de PEP 8:
 ```bash

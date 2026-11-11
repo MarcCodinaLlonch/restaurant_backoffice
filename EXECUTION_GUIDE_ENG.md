@@ -149,12 +149,12 @@ Follow this walkthrough to verify that full data lifecycles operate over the net
 
 ---
 
-## STEP 6: Bonus Verification (Testing the Server with `curl`)
+## STEP 6: Bonus Verification (Testing the Server with `curl` or VS Code REST Client)
 
-Because the server implements standard HTTP/1.1 over TCP, you can open a **third terminal** and query the backend directly:
+Because the server implements HTTP/1.1 over TLS with a self-signed certificate, you can open a **third terminal** and query the backend with `curl -k` (`--insecure`, equivalent to Python's `ssl._create_unverified_context()`) or use `requests.http` with the **REST Client** extension in VS Code:
 
 ```bash
-curl -i http://localhost:8088/categories
+curl -k -i https://localhost:8088/categories
 ```
 
 **Server Response:**
@@ -163,6 +163,7 @@ HTTP/1.1 200 OK
 Connection: close
 Content-Type: application/json; charset=utf-8
 Content-Length: 182
+Content-Hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
 [{"id": 1, "category_name": "Entrants"}, {"id": 2, "category_name": "Primers Plats"}, ...]
 ```

@@ -150,12 +150,12 @@ Pots seguir aquest guió per comprovar que tot el cicle de vida de les dades fun
 
 ---
 
-## PAS 6: Prova "Bonus" (Provar el teu servidor amb `curl` o navegador)
+## PAS 6: Prova "Bonus" (Provar el teu servidor amb `curl` o l'extensió REST Client de VS Code)
 
-Com que el teu servidor parla el protocol estàndard HTTP/1.1 sobre TCP, pots obrir una **tercera terminal** i provar-ho sense fer servir el client de Python:
+Com que el servidor parla HTTP/1.1 sobre TLS amb certificat autosignat, pots obrir una **tercera terminal** i provar-ho amb `curl -k` (`--insecure`, equivalent al `ssl._create_unverified_context()` de Python) o obrir el fitxer `requests.http` amb l'extensió **REST Client** de VS Code:
 
 ```bash
-curl -i http://localhost:8088/categories
+curl -k -i https://localhost:8088/categories
 ```
 
 **Què respon el teu servidor:**
@@ -164,6 +164,7 @@ HTTP/1.1 200 OK
 Connection: close
 Content-Type: application/json; charset=utf-8
 Content-Length: 182
+Content-Hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
 [{"id": 1, "category_name": "Entrants"}, {"id": 2, "category_name": "Primers Plats"}, ...]
 ```

@@ -65,6 +65,7 @@ Host: 127.0.0.1:8088\r\n
 Accept: application/json\r\n
 Content-Type: application/json; charset=utf-8\r\n
 Content-Length: 29\r\n
+Content-Hash: 8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4\r\n
 \r\n
 {"category_name": "Postres"}
 ```
@@ -73,7 +74,7 @@ Content-Length: 29\r\n
 
 Una resposta consta de:
 1. **Línia d'estat (Status Line)**: `<VERSIÓ_PROTOCOL> <CODI_ESTAT> <TEXT_ESTAT>\r\n`
-2. **Capçaleres (Headers)**: Informació del tipus de contingut i longitud.
+2. **Capçaleres (Headers)**: Informació del tipus de contingut, longitud (`Content-Length`) i resum d'integritat SHA-256 (`Content-Hash`).
 3. **Separador de capçaleres**: Línia buida `\r\n`
 4. **Cos (Body)**: Dades JSON en UTF-8 (si s'escau).
 
@@ -82,6 +83,7 @@ HTTP/1.1 201 Created\r\n
 Connection: close\r\n
 Content-Type: application/json; charset=utf-8\r\n
 Content-Length: 38\r\n
+Content-Hash: 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae\r\n
 \r\n
 {"id": 4, "category_name": "Postres"}
 ```

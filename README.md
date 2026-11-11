@@ -87,21 +87,31 @@ This version implements:
    docker compose up -d
    ```
 
+6. **Generate the server TLS certificates manually with OpenSSL (Practice 3):**
+   ```bash
+   mkdir -p certs
+   # 1. Generate self-signed certificate (cert.pem) and private key (key.pem)
+   openssl req -x509 -newkey rsa:4096 -keyout certs/key.pem -out certs/cert.pem -days 365 -nodes -subj "/CN=localhost"
+
+   # 2. (Optional) Bundle into PKCS#12 (.p12) format
+   openssl pkcs12 -export -out certs/server.p12 -inkey certs/key.pem -in certs/cert.pem -passout pass:1234
+   ```
+
 ---
 
 ## 💻 Running the Application
 
-### 1. Start the asyncio server
+### 1. Start the asyncio TLS server
 ```bash
 python server/server.py
 ```
-The server listens on `0.0.0.0:8088`. Stop it with **Ctrl+C**: it closes cleanly and prints `Server stopped, resources released`.
+The server loads the certificate (`certs/cert.pem` + `certs/key.pem`) using `ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)` and listens on `https://0.0.0.0:8088`. Stop it with **Ctrl+C**: it closes cleanly and prints `Server stopped, resources released`.
 
 ### 2. Start the interactive client (one or more terminals)
 ```bash
 python client/client.py
 ```
-Open it in several terminals at the same time: every client is served concurrently. The menu covers employees (with 1:1 credentials), categories, dishes (with allergens), allergens, menus (with dishes) and sales (composite primary key).
+The client connects over TLS using `ssl._create_unverified_context()` to accept the server's self-signed certificate and verifies payload integrity via the `Content-Hash` (SHA-256) header. Open it in several terminals at the same time: every client is served concurrently.
 
 ### 3. Automated client launcher (load test)
 ```bash
@@ -124,7 +134,7 @@ python experiments/03_blocking_db_impact.py  # impact of the synchronous DB: 2 m
 ```bash
 pytest -v
 ```
-All **47 tests** pass (they do not need PostgreSQL):
+All **50 tests** pass (they do not need PostgreSQL):
 
 | Area | Test files |
 |---|---|
@@ -132,6 +142,7 @@ All **47 tests** pass (they do not need PostgreSQL):
 | Router | `test_router.py` |
 | Protocol serialization / deserialization | `test_request_parser.py`, `test_response_builder.py`, `test_async_request_reader.py` |
 | Multi-client and robustness | `test_async_server.py` (20 concurrent clients, idle client, disconnection, unexpected error, 408, 400, 413, Practice 1 client) |
+| TLS Security & `Content-Hash` | `test_security_tls.py` (self-signed OpenSSL cert, `ssl._create_unverified_context()`, SHA-256 integrity) |
 
 PEP 8 check:
 ```bash

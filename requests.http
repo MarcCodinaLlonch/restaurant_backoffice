@@ -1,0 +1,27 @@
+# Fitxer de proves per a l'extensió "REST Client" de VS Code
+# (Per a certificats autosignats a VS Code, afegeix "rest-client.certificates": {} o desactiva SSL strict a Settings)
+@baseUrl = https://localhost:8088
+
+### 1. Llistar totes les categories
+GET {{baseUrl}}/categories
+Accept: application/json
+
+### 2. Crear una nova categoria
+POST {{baseUrl}}/categories
+Content-Type: application/json; charset=utf-8
+
+{
+  "category_name": " Begudes "
+}
+
+### 3. Llistar tots els plats actius
+GET {{baseUrl}}/dishes?active=true
+Accept: application/json
+
+### 4. Llistar tots els empleats
+GET {{baseUrl}}/employees
+Accept: application/json
+
+### 5. Llistar tots els menús
+GET {{baseUrl}}/menus
+Accept: application/json
