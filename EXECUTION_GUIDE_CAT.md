@@ -152,10 +152,10 @@ Pots seguir aquest guió per comprovar que tot el cicle de vida de les dades fun
 
 ## PAS 6: Prova "Bonus" (Provar el teu servidor amb `curl` o l'extensió REST Client de VS Code)
 
-Com que el servidor parla HTTP/1.1 sobre TLS amb certificat autosignat, pots obrir una **tercera terminal** i provar-ho amb `curl -k` (`--insecure`, equivalent al `ssl._create_unverified_context()` de Python) o obrir el fitxer `requests.http` amb l'extensió **REST Client** de VS Code:
+Com que el servidor parla HTTP/1.1 sobre TLS amb el certificat `certs/cert.pem`, pots obrir una **tercera terminal** i provar-ho passant `--cacert certs/cert.pem` a `curl` (igual que fa el client Python amb `cafile="certs/cert.pem"`) o obrir el fitxer `requests.http` amb l'extensió **REST Client** de VS Code:
 
 ```bash
-curl -k -i https://localhost:8088/categories
+curl --cacert certs/cert.pem -i https://localhost:8088/categories
 ```
 
 **Què respon el teu servidor:**

@@ -90,8 +90,10 @@ Aquesta versió implementa:
 6. **Generar els certificats TLS del servidor a mà amb OpenSSL (Pràctica 3):**
    ```bash
    mkdir -p certs
-   # 1. Generar certificat autosignat (cert.pem) i clau privada (key.pem)
-   openssl req -x509 -newkey rsa:4096 -keyout certs/key.pem -out certs/cert.pem -days 365 -nodes -subj "/CN=localhost"
+   # 1. Generar certificat autosignat amb SAN (cert.pem) i clau privada (key.pem)
+   MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+     -keyout certs/key.pem -out certs/cert.pem -subj "/CN=localhost" \
+     -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
 
    # 2. (Opcional) Empaquetar en format PKCS#12 (.p12)
    openssl pkcs12 -export -out certs/server.p12 -inkey certs/key.pem -in certs/cert.pem -passout pass:1234
@@ -111,7 +113,7 @@ El servidor carrega el certificat (`certs/cert.pem` + `certs/key.pem`) amb `ssl.
 ```bash
 python client/client.py
 ```
-El client es connecta sobre TLS utilitzant `ssl._create_unverified_context()` per acceptar el certificat autosignat del servidor i verifica la integritat de cada missatge amb la capçalera `Content-Hash` (SHA-256). Obre'l en diversos terminals alhora: tots els clients s'atenen concurrentment.
+El client es connecta sobre TLS utilitzant `ssl.create_default_context(cafile="certs/cert.pem")` per verificar que parla amb el servidor de debò (signatura i SAN) i comprova la integritat de cada missatge amb la capçalera `Content-Hash` (SHA-256). Obre'l en diversos terminals alhora: tots els clients s'atenen concurrentment.
 
 ### 3. Llançador automàtic de clients (prova de càrrega)
 ```bash
@@ -134,7 +136,7 @@ python experiments/03_blocking_db_impact.py  # impacte de la BD síncrona: consu
 ```bash
 pytest -v
 ```
-Passen els **50 tests** (no necessiten PostgreSQL):
+Passen els **58 tests** (no necessiten PostgreSQL):
 
 | Àrea | Fitxers de tests |
 |---|---|
@@ -142,7 +144,7 @@ Passen els **50 tests** (no necessiten PostgreSQL):
 | Router | `test_router.py` |
 | Serialització / deserialització del protocol | `test_request_parser.py`, `test_response_builder.py`, `test_async_request_reader.py` |
 | Multiclient i robustesa | `test_async_server.py` (20 clients alhora, client inactiu, desconnexió, error inesperat, 408, 400, 413, client de la P1) |
-| Seguretat TLS i `Content-Hash` | `test_security_tls.py` (certificat autosignat amb OpenSSL, `ssl._create_unverified_context()`, integritat SHA-256) |
+| Seguretat TLS i `Content-Hash` | `test_security_tls.py` (verificació de certificat i SAN amb `cafile`, TLS 1.3 + AES-GCM, rebuig de servidor fals i integritat SHA-256) |
 
 Comprovació de PEP 8:
 ```bash

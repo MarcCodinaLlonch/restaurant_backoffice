@@ -151,10 +151,10 @@ Follow this walkthrough to verify that full data lifecycles operate over the net
 
 ## STEP 6: Bonus Verification (Testing the Server with `curl` or VS Code REST Client)
 
-Because the server implements HTTP/1.1 over TLS with a self-signed certificate, you can open a **third terminal** and query the backend with `curl -k` (`--insecure`, equivalent to Python's `ssl._create_unverified_context()`) or use `requests.http` with the **REST Client** extension in VS Code:
+Because the server implements HTTP/1.1 over TLS with `certs/cert.pem`, you can open a **third terminal** and query the backend passing `--cacert certs/cert.pem` to `curl` (matching Python's `cafile="certs/cert.pem"`) or use `requests.http` with the **REST Client** extension in VS Code:
 
 ```bash
-curl -k -i https://localhost:8088/categories
+curl --cacert certs/cert.pem -i https://localhost:8088/categories
 ```
 
 **Server Response:**
