@@ -24,14 +24,17 @@ from rich.table import Table  # noqa: E402
 from client.src.protocol.http_client import decode_response, encode_request  # noqa: E402
 
 console = Console()
+CLIENT_CA_FILE = os.getenv("CLIENT_CA_FILE", "certs/cert.pem")
 
 
-async def send_request(host: str, port: int, path: str) -> tuple[int, float]:
+async def send_request(
+    host: str, port: int, path: str, ca_file: str = CLIENT_CA_FILE
+) -> tuple[int, float]:
     """Un client: connecta amb TLS, envia un GET i llegeix la resposta (codi HTTP, segons)."""
     start = time.perf_counter()
     try:
-        # CLAU: open_connection amb ssl._create_unverified_context() per al certificat autosignat.
-        ssl_ctx = ssl._create_unverified_context()
+        # CLAU (Pràctica 3): verifiquem el certificat del servidor i el SAN amb cafile.
+        ssl_ctx = ssl.create_default_context(cafile=ca_file)
         reader, writer = await asyncio.open_connection(host, port, ssl=ssl_ctx)
         writer.write(encode_request("GET", path, host, port))
         await writer.drain()
@@ -44,10 +47,10 @@ async def send_request(host: str, port: int, path: str) -> tuple[int, float]:
     return status_code, time.perf_counter() - start
 
 
-async def idle_client(host: str, port: int, seconds: float) -> None:
+async def idle_client(host: str, port: int, seconds: float, ca_file: str = CLIENT_CA_FILE) -> None:
     """Client "mut": connecta i no envia res. Demostra que no bloqueja els altres."""
-    # CLAU: obre connexió TLS i no envia res per demostrar el timeout 408 sense bloquejar el loop.
-    ssl_ctx = ssl._create_unverified_context()
+    # CLAU (Pràctica 3): obre connexió TLS verificada i no envia res (demostra timeout 408).
+    ssl_ctx = ssl.create_default_context(cafile=ca_file)
     _, writer = await asyncio.open_connection(host, port, ssl=ssl_ctx)
     await asyncio.sleep(seconds)
     writer.close()
@@ -57,7 +60,7 @@ async def idle_client(host: str, port: int, seconds: float) -> None:
 async def run_load_test(args: argparse.Namespace) -> None:
     # 1. Clients inactius en segon pla (create_task: s'executen mentre continuem).
     idle_tasks = [
-        asyncio.create_task(idle_client(args.host, args.port, seconds=3.0))
+        asyncio.create_task(idle_client(args.host, args.port, seconds=3.0, ca_file=args.ca_file))
         for _ in range(args.idle_clients)
     ]
     await asyncio.sleep(0.1)  # ens assegurem que ja estan connectats
@@ -67,12 +70,16 @@ async def run_load_test(args: argparse.Namespace) -> None:
     if args.sequential:
         # CLAU: mode seqüencial: dos await seguits no són concurrents; serveix per comparar temps.
         results = [
-            await send_request(args.host, args.port, args.path) for _ in range(args.clients)
+            await send_request(args.host, args.port, args.path, ca_file=args.ca_file)
+            for _ in range(args.clients)
         ]
     else:
         # CLAU: asyncio.gather llança N clients alhora (demostració de concurrència real).
         results = await asyncio.gather(
-            *(send_request(args.host, args.port, args.path) for _ in range(args.clients))
+            *(
+                send_request(args.host, args.port, args.path, ca_file=args.ca_file)
+                for _ in range(args.clients)
+            )
         )
     total_time = time.perf_counter() - start
 
@@ -108,6 +115,7 @@ def main() -> None:
     parser.add_argument("--path", default="/dishes")
     parser.add_argument("--idle-clients", type=int, default=0)
     parser.add_argument("--sequential", action="store_true")
+    parser.add_argument("--ca-file", default=CLIENT_CA_FILE)
     asyncio.run(run_load_test(parser.parse_args()))
 
 

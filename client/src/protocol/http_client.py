@@ -1,12 +1,15 @@
 # http_client.py: client HTTP sobre sockets TCP/TLS (dict ⇄ bytes HTTP, envia i rep).
 
 import json
+import os
 import socket
 import ssl
 from dataclasses import dataclass
 from typing import Any, Optional
 
 from common.security.digest import DIGEST_HEADER, compute_digest, verify_digest
+
+CLIENT_CA_FILE = os.getenv("CLIENT_CA_FILE", "certs/cert.pem")
 
 
 @dataclass
@@ -133,11 +136,13 @@ class HttpClient:
         port: int = 8088,
         timeout: float = 10.0,
         use_ssl: bool = True,
+        ca_file: str | None = None,
     ):
         self.host = host
         self.port = port
         self.timeout = timeout
         self.use_ssl = use_ssl
+        self.ca_file = ca_file if ca_file is not None else CLIENT_CA_FILE
         self.last_tls_info: tuple[str | None, str | None] | None = None
 
     def _send_request(self, method: str, path: str, body: Any = None) -> ApiResponse:
@@ -146,16 +151,17 @@ class HttpClient:
         """
         raw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         raw_sock.settimeout(self.timeout)
-
-        # CLAU (Pràctica 3): ssl._create_unverified_context() accepta el certificat autosignat
-        # del servidor sense llançar CERTIFICATE_VERIFY_FAILED.
-        if self.use_ssl:
-            context = ssl._create_unverified_context()
-            sock = context.wrap_socket(raw_sock, server_hostname=self.host)
-        else:
-            sock = raw_sock
+        sock: socket.socket = raw_sock
 
         try:
+            # CLAU (Pràctica 3): el client confia només en aquest certificat. Durant el handshake
+            # el servidor signa amb la seva clau privada, el client ho verifica amb la clau pública
+            # de cert.pem i comprova el nom (SAN). Si és un servidor fals, la connexió es talla
+            # abans d'enviar cap dada.
+            if self.use_ssl:
+                context = ssl.create_default_context(cafile=self.ca_file)
+                sock = context.wrap_socket(raw_sock, server_hostname=self.host)
+
             sock.connect((self.host, self.port))
             if self.use_ssl and isinstance(sock, ssl.SSLSocket):
                 cipher = sock.cipher()
@@ -174,7 +180,19 @@ class HttpClient:
 
             return decode_response(bytes(response_buffer))
 
-        # CLAU: errors de xarxa convertits a ApiResponse local (503/504/500); el client no peta.
+        # CLAU: errors de xarxa i TLS convertits a ApiResponse local; el client no peta.
+        except ssl.SSLCertVerificationError as error:
+            return ApiResponse(
+                status_code=503,
+                data=None,
+                error_message=f"No s'ha pogut verificar el certificat del servidor: {error}",
+            )
+        except ssl.SSLError as error:
+            return ApiResponse(
+                status_code=503,
+                data=None,
+                error_message=f"Error TLS amb el servidor: {error}",
+            )
         except ConnectionRefusedError:
             return ApiResponse(
                 status_code=503,
