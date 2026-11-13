@@ -1,5 +1,5 @@
 """
-test_security_tls.py: Proves de la Pràctica 3 (TLS 1.3 + AES-GCM i digest SHA-256 obligatori).
+test_security_tls.py: Proves de la Pràctica 3 (verificació TLS + SAN, AES-GCM i digest SHA-256).
 """
 
 import asyncio
@@ -28,13 +28,8 @@ class FakeRouter:
         return ResponseBuilder.not_found("Route not found")
 
 
-@pytest.fixture(scope="module")
-def sample_certs(tmp_path_factory) -> dict[str, Path]:
-    """Genera cert.pem i key.pem temporals amb la mateixa comanda OpenSSL de classe."""
-    cert_dir = tmp_path_factory.mktemp("certs")
-    cert_pem = cert_dir / "cert.pem"
-    key_pem = cert_dir / "key.pem"
-
+def _generate_self_signed_cert(cert_pem: Path, key_pem: Path, cn: str = "localhost") -> None:
+    """Executa OpenSSL per crear un certificat autosignat amb extensió SAN."""
     subprocess.run(
         [
             "openssl",
@@ -42,20 +37,39 @@ def sample_certs(tmp_path_factory) -> dict[str, Path]:
             "-x509",
             "-newkey",
             "rsa:2048",
+            "-nodes",
+            "-days",
+            "365",
             "-keyout",
             str(key_pem),
             "-out",
             str(cert_pem),
-            "-days",
-            "365",
-            "-nodes",
             "-subj",
-            "/CN=localhost",
+            f"/CN={cn}",
+            "-addext",
+            "subjectAltName=DNS:localhost,IP:127.0.0.1",
         ],
         check=True,
         capture_output=True,
     )
-    return {"cert": cert_pem, "key": key_pem}
+
+
+@pytest.fixture(scope="module")
+def sample_certs(tmp_path_factory) -> dict[str, Path]:
+    """Genera el certificat del servidor (amb SAN) i un segon certificat no confiat."""
+    cert_dir = tmp_path_factory.mktemp("certs")
+    cert_pem = cert_dir / "cert.pem"
+    key_pem = cert_dir / "key.pem"
+    untrusted_cert_pem = cert_dir / "untrusted_cert.pem"
+    untrusted_key_pem = cert_dir / "untrusted_key.pem"
+
+    _generate_self_signed_cert(cert_pem, key_pem, cn="localhost")
+    _generate_self_signed_cert(untrusted_cert_pem, untrusted_key_pem, cn="fake-server")
+    return {
+        "cert": cert_pem,
+        "key": key_pem,
+        "untrusted_cert": untrusted_cert_pem,
+    }
 
 
 @pytest.fixture
@@ -73,9 +87,17 @@ async def tls_server_port(sample_certs):
         yield port
 
 
-async def test_tls_client_with_unverified_context_connects_and_encrypts(tls_server_port: int):
-    """El client amb ssl._create_unverified_context() es connecta al servidor TLS autosignat."""
-    client = HttpClient(host=HOST, port=tls_server_port, timeout=2.0, use_ssl=True)
+async def test_tls_client_verifies_server_certificate_and_connects(
+    tls_server_port: int, sample_certs
+):
+    """El client verifica el certificat del servidor (cafile + SAN) i es connecta amb TLS."""
+    client = HttpClient(
+        host=HOST,
+        port=tls_server_port,
+        timeout=2.0,
+        use_ssl=True,
+        ca_file=str(sample_certs["cert"]),
+    )
     response = await asyncio.to_thread(client.get, "/categories")
     assert response.is_success
     assert response.data == [{"id": 1, "category_name": "Begudes"}]
@@ -83,9 +105,9 @@ async def test_tls_client_with_unverified_context_connects_and_encrypts(tls_serv
     assert client.last_tls_info[0] == "TLSv1.3"
 
 
-async def test_tls_session_uses_tls13_and_aes_gcm(tls_server_port: int):
-    """La sessió TLS negocia TLSv1.3 (ECDHE) i xifratge simètric AES-GCM."""
-    ssl_ctx = ssl._create_unverified_context()
+async def test_tls_session_uses_tls13_and_aes_gcm(tls_server_port: int, sample_certs):
+    """La sessió TLS verificada negocia TLSv1.3 (ECDHE) i xifratge simètric AES-GCM."""
+    ssl_ctx = ssl.create_default_context(cafile=str(sample_certs["cert"]))
     reader, writer = await asyncio.open_connection(HOST, tls_server_port, ssl=ssl_ctx)
     try:
         ssl_obj = writer.get_extra_info("ssl_object")
@@ -100,9 +122,45 @@ async def test_tls_session_uses_tls13_and_aes_gcm(tls_server_port: int):
         await writer.wait_closed()
 
 
-async def test_request_without_digest_is_rejected(tls_server_port: int):
+async def test_client_rejects_untrusted_server_certificate(tls_server_port: int, sample_certs):
+    """Un client amb un altre certificat rebutja el servidor amb SSLCertVerificationError."""
+    ssl_ctx = ssl.create_default_context(cafile=str(sample_certs["untrusted_cert"]))
+    with pytest.raises(ssl.SSLCertVerificationError):
+        await asyncio.open_connection(HOST, tls_server_port, ssl=ssl_ctx)
+
+
+async def test_client_rejects_hostname_mismatch(tls_server_port: int, sample_certs):
+    """Si server_hostname no coincideix amb el SAN del certificat, falla la verificació."""
+    ssl_ctx = ssl.create_default_context(cafile=str(sample_certs["cert"]))
+    with pytest.raises(ssl.SSLCertVerificationError):
+        await asyncio.open_connection(
+            HOST,
+            tls_server_port,
+            ssl=ssl_ctx,
+            server_hostname="otro-servidor",
+        )
+
+
+async def test_http_client_returns_error_on_untrusted_certificate(
+    tls_server_port: int, sample_certs
+):
+    """HttpClient captura l'error de certificat i retorna un ApiResponse d'error sense petar."""
+    client = HttpClient(
+        host=HOST,
+        port=tls_server_port,
+        timeout=2.0,
+        use_ssl=True,
+        ca_file=str(sample_certs["untrusted_cert"]),
+    )
+    response = await asyncio.to_thread(client.get, "/categories")
+    assert not response.is_success
+    assert response.status_code == 503
+    assert "certificat" in (response.error_message or "").lower()
+
+
+async def test_request_without_digest_is_rejected(tls_server_port: int, sample_certs):
     """Un POST amb cos i sense capçalera Content-Hash és rebutjat amb 400 Bad Request."""
-    ssl_ctx = ssl._create_unverified_context()
+    ssl_ctx = ssl.create_default_context(cafile=str(sample_certs["cert"]))
     body = b'{"name": "Entrants"}'
     raw_req = (
         f"POST /categories HTTP/1.1\r\n"
@@ -123,9 +181,9 @@ async def test_request_without_digest_is_rejected(tls_server_port: int):
     assert "falta la capçalera" in (decoded.error_message or "")
 
 
-async def test_request_with_tampered_digest_is_rejected(tls_server_port: int):
+async def test_request_with_tampered_digest_is_rejected(tls_server_port: int, sample_certs):
     """El servidor accepta peticions amb digest vàlid i rebutja amb 400 si el cos s'altera."""
-    ssl_ctx = ssl._create_unverified_context()
+    ssl_ctx = ssl.create_default_context(cafile=str(sample_certs["cert"]))
 
     # 1. Petició POST vàlida
     valid_req = encode_request("POST", "/categories", HOST, tls_server_port, {"name": "Entrants"})
