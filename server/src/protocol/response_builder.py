@@ -1,8 +1,9 @@
 # response_builder.py: construeix les respostes HTTP (codi, capçaleres i JSON) en bytes.
 
-import hashlib
 import json
 from typing import Any
+
+from common.security.digest import DIGEST_HEADER, compute_digest
 
 
 class ResponseBuilder:
@@ -42,12 +43,11 @@ class ResponseBuilder:
             clean_data = ResponseBuilder._serialize_data(data)
             # ensure_ascii=False per mantenir caràcters catalans com à, è, ç, ·
             json_bytes = json.dumps(clean_data, ensure_ascii=False).encode("utf-8")
-            body_hash = hashlib.sha256(json_bytes).hexdigest()
             headers.append("Content-Type: application/json; charset=utf-8")
             # CLAU: Content-Length es calcula sobre els BYTES de json_bytes, no sobre caràcters.
             headers.append(f"Content-Length: {len(json_bytes)}")
             # CLAU (Pràctica 3): Content-Hash (SHA-256) garanteix la integritat del cos JSON.
-            headers.append(f"Content-Hash: {body_hash}")
+            headers.append(f"{DIGEST_HEADER}: {compute_digest(json_bytes)}")
             # Unim les capçaleres amb \r\n, afegim línia buida final i el cos de bytes
             # CLAU: estructura HTTP: línia d'estat + capçaleres + línia buida (\r\n\r\n) + cos.
             header_str = "\r\n".join(headers) + "\r\n\r\n"

@@ -3,7 +3,8 @@ async_request_reader.py: Lector asíncron de peticions HTTP sobre asyncio.Stream
 """
 
 import asyncio
-import hashlib
+
+from common.security.digest import DIGEST_HEADER, verify_digest
 
 from .errors import PayloadTooLargeError, ProtocolError
 from .request_parser import HttpRequest, RequestParser
@@ -63,15 +64,15 @@ async def read_request(
                 f"({len(exc.partial)}/{content_length} bytes)."
             ) from exc
 
-        # CLAU (Pràctica 3): si la petició inclou Content-Hash, verifiquem la integritat SHA-256
-        # del cos rebut abans de fer el json.loads.
-        expected_hash = request.headers.get("content-hash")
-        if expected_hash is not None:
-            actual_hash = hashlib.sha256(raw_body).hexdigest()
-            if actual_hash != expected_hash:
-                raise ProtocolError(
-                    "Integritat fallida: el Content-Hash no coincideix amb el cos rebut."
-                )
+        # CLAU (Pràctica 3): tota petició amb cos ha de portar obligatòriament la capçalera
+        # Content-Hash (SHA-256) i ha de coincidir amb els bytes rebuts.
+        received_digest = request.headers.get(DIGEST_HEADER.lower())
+        if not received_digest or not received_digest.strip():
+            raise ProtocolError(f"Integritat fallida: falta la capçalera {DIGEST_HEADER}.")
+        if not verify_digest(raw_body, received_digest):
+            raise ProtocolError(
+                f"Integritat fallida: el {DIGEST_HEADER} no coincideix amb el cos rebut."
+            )
 
         content_type = request.headers.get("content-type", "")
         request.body = RequestParser.parse_body(raw_body, content_type)

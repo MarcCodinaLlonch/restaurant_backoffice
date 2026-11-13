@@ -1,11 +1,12 @@
 # http_client.py: client HTTP sobre sockets TCP/TLS (dict ⇄ bytes HTTP, envia i rep).
 
-import hashlib
 import json
 import socket
 import ssl
 from dataclasses import dataclass
 from typing import Any, Optional
+
+from common.security.digest import DIGEST_HEADER, compute_digest, verify_digest
 
 
 @dataclass
@@ -43,11 +44,10 @@ def encode_request(method: str, path: str, host: str, port: int, body: Any = Non
     ]
 
     if body_bytes:
-        body_hash = hashlib.sha256(body_bytes).hexdigest()
         request_lines.append("Content-Type: application/json; charset=utf-8")
         request_lines.append(f"Content-Length: {len(body_bytes)}")
         # CLAU (Pràctica 3): afegim el hash SHA-256 del cos per verificar-ne la integritat.
-        request_lines.append(f"Content-Hash: {body_hash}")
+        request_lines.append(f"{DIGEST_HEADER}: {compute_digest(body_bytes)}")
 
     request_text = "\r\n".join(request_lines) + "\r\n\r\n"
     return request_text.encode("utf-8") + body_bytes
@@ -79,21 +79,30 @@ def decode_response(raw_bytes: bytes) -> ApiResponse:
     status_line = header_lines[0].split()
     status_code = int(status_line[1]) if len(status_line) > 1 else 500
 
-    # CLAU (Pràctica 3): si el servidor envia Content-Hash, comprovem que el cos no s'ha alterat.
+    # CLAU (Pràctica 3): si la resposta té cos, el Content-Hash és obligatori i ha de coincidir.
     headers_dict: dict[str, str] = {}
     for line in header_lines[1:]:
         if ":" in line:
             key, val = line.split(":", 1)
             headers_dict[key.strip().lower()] = val.strip()
 
-    expected_hash = headers_dict.get("content-hash")
-    if expected_hash and raw_body_bytes:
-        actual_hash = hashlib.sha256(raw_body_bytes).hexdigest()
-        if actual_hash != expected_hash:
+    if raw_body_bytes:
+        received_digest = headers_dict.get(DIGEST_HEADER.lower())
+        if not received_digest or not received_digest.strip():
             return ApiResponse(
                 status_code=500,
                 data=None,
-                error_message="Error d'integritat: el Content-Hash de la resposta no coincideix.",
+                error_message=(
+                    f"Error d'integritat: falta la capçalera {DIGEST_HEADER} a la resposta."
+                ),
+            )
+        if not verify_digest(raw_body_bytes, received_digest):
+            return ApiResponse(
+                status_code=500,
+                data=None,
+                error_message=(
+                    f"Error d'integritat: el {DIGEST_HEADER} de la resposta no coincideix."
+                ),
             )
 
     parsed_data = None
@@ -129,6 +138,7 @@ class HttpClient:
         self.port = port
         self.timeout = timeout
         self.use_ssl = use_ssl
+        self.last_tls_info: tuple[str | None, str | None] | None = None
 
     def _send_request(self, method: str, path: str, body: Any = None) -> ApiResponse:
         """
@@ -147,6 +157,9 @@ class HttpClient:
 
         try:
             sock.connect((self.host, self.port))
+            if self.use_ssl and isinstance(sock, ssl.SSLSocket):
+                cipher = sock.cipher()
+                self.last_tls_info = (sock.version(), cipher[0] if cipher else None)
             full_request_bytes = encode_request(method, path, self.host, self.port, body)
             # sendall insisteix fins transmetre tots els bytes (a diferència de send).
             sock.sendall(full_request_bytes)
