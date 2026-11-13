@@ -7,6 +7,7 @@ import asyncio
 
 import pytest
 
+from common.security.digest import DIGEST_HEADER, compute_digest
 from server.src.protocol.async_request_reader import read_request
 from server.src.protocol.errors import PayloadTooLargeError, ProtocolError
 from server.src.protocol.response_builder import ResponseBuilder
@@ -29,12 +30,16 @@ async def test_read_request_get_without_body():
 
 @pytest.mark.asyncio
 async def test_read_request_post_with_json_body():
-    """Comprova la lectura d'un POST amb cos JSON delimitat per Content-Length."""
+    """Comprova la lectura d'un POST amb cos JSON delimitat per Content-Length i Content-Hash."""
     body_json = b'{"name": "Begudes"}'
+    digest = compute_digest(body_json)
     raw_data = (
         b"POST /categories HTTP/1.1\r\n"
         b"Content-Type: application/json\r\n"
-        b"Content-Length: " + str(len(body_json)).encode() + b"\r\n\r\n" + body_json
+        b"Content-Length: "
+        + str(len(body_json)).encode()
+        + f"\r\n{DIGEST_HEADER}: {digest}\r\n\r\n".encode()
+        + body_json
     )
     reader = asyncio.StreamReader()
     reader.feed_data(raw_data)

@@ -12,6 +12,7 @@ import time
 import pytest
 
 from client.src.protocol.http_client import HttpClient, decode_response, encode_request
+from common.security.digest import DIGEST_HEADER, compute_digest
 from server.src.network import ClientConnectionHandler
 from server.src.protocol.response_builder import ResponseBuilder
 
@@ -123,6 +124,11 @@ def test_encode_and_decode_are_consistent():
     encoded = encode_request("POST", "/test", HOST, 8088, body={"hello": "world"})
     assert encoded.startswith(b"POST /test HTTP/1.1\r\n")
     assert b"Content-Length: 18\r\n" in encoded
-    decoded = decode_response(b'HTTP/1.1 200 OK\r\nContent-Length: 15\r\n\r\n{"key":"value"}')
+    body = b'{"key":"value"}'
+    raw_resp = (
+        f"HTTP/1.1 200 OK\r\nContent-Length: {len(body)}\r\n"
+        f"{DIGEST_HEADER}: {compute_digest(body)}\r\n\r\n"
+    ).encode("utf-8") + body
+    decoded = decode_response(raw_resp)
     assert decoded.status_code == 200
     assert decoded.data == {"key": "value"}
