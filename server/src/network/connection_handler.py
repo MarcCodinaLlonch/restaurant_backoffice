@@ -33,6 +33,17 @@ class ClientConnectionHandler:
         # (stateless).
         client_address = writer.get_extra_info("peername")
         logger.info("Client connected: %s", client_address)
+        # CLAU (Pràctica 3): el handshake TLS fa un intercanvi de clau efímer (ECDHE,
+        # Diffie-Hellman) i després xifra el trànsit amb una clau simètrica AES-GCM.
+        ssl_object = writer.get_extra_info("ssl_object")
+        if ssl_object is not None:
+            cipher = ssl_object.cipher()
+            logger.info(
+                "TLS session with %s: %s, %s",
+                client_address,
+                ssl_object.version(),
+                cipher[0] if cipher else "unknown",
+            )
         try:
             # CLAU: mentre espera la resposta, la Task es pausa i l'event loop atén altres clients.
             response = await self._build_response(reader, client_address)
